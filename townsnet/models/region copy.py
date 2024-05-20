@@ -19,7 +19,6 @@ class OkrugRow(BaseRow):
 
 class TownRow(BaseRow):
     name : str
-    level: str
     geometry : shapely.Point
     population : int
 
@@ -35,7 +34,6 @@ class Town(BaseModel):
     id : int
     name : str
     population : int
-    level: str
     geometry : InstanceOf[shapely.Point]
     _capacities : dict[ServiceType, int] = {}
 
@@ -55,7 +53,6 @@ class Town(BaseModel):
             'id': self.id,
             'name': self.name,
             'population': self.population,
-            'level' : self.level,
             'geometry': self.geometry
         }
         for service_type in self._capacities.keys():
@@ -87,10 +84,9 @@ class Region():
             territory = GeoDataFrame[RayonRow](territory)
         assert (adjacency_matrix.index == adjacency_matrix.columns).all(), "Adjacency matrix indices and columns don't match"
         assert (adjacency_matrix.index == towns.index).all(), "Adjacency matrix indices and towns indices don't match"
-        assert(rayons.crs == okrugs.crs and okrugs.crs == towns.crs and territory.crs == okrugs.crs), 'CRS should march everywhere'
+        assert(rayons.crs == okrugs.crs and okrugs.crs == towns.crs), 'CRS should march everywhere'
         self.crs = towns.crs
         self.rayons = rayons
-        self.territory = territory
         self.okrugs = okrugs
         self.adjacency_matrix = adjacency_matrix
         self._towns = Town.from_gdf(towns)
@@ -119,10 +115,10 @@ class Region():
 
     def to_gdf(self):
         gdf = self.get_towns_gdf().sjoin(
-            self.okrugs[['geometry', 'name']].rename(columns={'name': 'okrug_name'}),
-            how='left',
+            self.okrugs[['geometry', 'name']].rename(columns={'name': 'okrug_name'}), 
+            how='left', 
             predicate='within',
-            lsuffix='_town',
+            lsuffix='_town', 
             rsuffix='_okrug'
         )
         gdf = gdf.sjoin(
