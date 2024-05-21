@@ -68,7 +68,7 @@ class PopFrame(BaseMethod):
         """Saves the graph as an HTML file with a map visualization"""
         towns = self.region.get_towns_gdf()
 
-        m = folium.Map(location=[59.939095, 30.315868], zoom_start=8, tiles='CartoDB Positron')
+        m = folium.Map(zoom_start=3, tiles='CartoDB Positron')
 
         level_colors = {
             'Пятый уровень': '#6996B3',  # Синий для 1 уровня
