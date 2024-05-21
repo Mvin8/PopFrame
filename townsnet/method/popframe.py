@@ -1,14 +1,10 @@
 from typing import List
 import networkx as nx
-import numpy as np
 import geopandas as gpd
 import folium
-import pyproj
-import utm
 
 from ..models.region import Town
 from .base_method import BaseMethod
-from ..models.region import Region
 
 class PopFrame(BaseMethod):
     """Class provides methods for network analysis on geographic data"""

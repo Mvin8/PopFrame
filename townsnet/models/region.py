@@ -1,13 +1,10 @@
 from functools import singledispatchmethod
-from pydantic import BaseModel, InstanceOf, field_validator, Field
-from typing import Optional
+from pydantic import BaseModel, InstanceOf
 import dill as pickle
 import shapely
 import geopandas as gpd
 import pandas as pd
 from .geodataframe import GeoDataFrame, BaseRow
-from ..utils import SERVICE_TYPES
-from .service_type import ServiceType
 
 class RayonRow(BaseRow):
     name : str
@@ -27,28 +24,12 @@ class TerRow(BaseRow):
     name : str
     geometry : shapely.Polygon | shapely.MultiPolygon
 
-class ServiceRow(BaseRow):
-    geometry : shapely.Point
-    capacity : int = Field(gt=0)
-
 class Town(BaseModel):
     id : int
     name : str
     population : int
     level: str
     geometry : InstanceOf[shapely.Point]
-    _capacities : dict[ServiceType, int] = {}
-
-    def __contains__(self, service_type: ServiceType) -> bool:
-        """Returns True if service type is contained in town"""
-        return service_type in self._capacities
-
-    def __getitem__(self, service_type: ServiceType) -> dict[str, int]:
-        """Get service type capacity and demand of the town"""
-        result = {"capacity": 0, "demand": service_type.calculate_in_need(self.population)}
-        if service_type in self._capacities:
-            result["capacity"] = self._capacities[service_type]
-        return result
 
     def to_dict(self):
         res = {
@@ -58,10 +39,6 @@ class Town(BaseModel):
             'level' : self.level,
             'geometry': self.geometry
         }
-        for service_type in self._capacities.keys():
-            st_dict = self[service_type]
-            for key, value in st_dict.items():
-                res[f'{service_type.name}_{key}'] = value
         return res
 
     @classmethod
@@ -70,10 +47,7 @@ class Town(BaseModel):
         for i in gdf.index:
             res[i] = cls(id=i, **gdf.loc[i].to_dict())
         return res 
-
-    def update_capacity(self, service_type : ServiceType, value : int = 0):
-        self._capacities[service_type] = value
-
+    
 class Region():
 
     def __init__(self, rayons : GeoDataFrame[RayonRow] | gpd.GeoDataFrame, okrugs : GeoDataFrame[OkrugRow] | gpd.GeoDataFrame, towns : GeoDataFrame[TownRow] | gpd.GeoDataFrame, adjacency_matrix : pd.DataFrame, territory : GeoDataFrame[TerRow] | gpd.GeoDataFrame,):
@@ -94,24 +68,6 @@ class Region():
         self.okrugs = okrugs
         self.adjacency_matrix = adjacency_matrix
         self._towns = Town.from_gdf(towns)
-        self._service_types = {}
-        for st in SERVICE_TYPES:
-            service_type = ServiceType(**st)
-            self._service_types[service_type.name] = service_type
-
-    def update_capacities(self, service_type: ServiceType | str, gdf: GeoDataFrame[ServiceRow]):
-        """Update capacities in towns of certain service_type"""
-        assert gdf.crs == self.crs, "Services GeoDataFrame CRS should match region CRS"
-        if not isinstance(service_type, ServiceType):
-            service_type = self[service_type]
-        # reset services of towns
-        for town in self.towns:
-            town.update_capacity(service_type)
-        # spatial join blocks and services and update related blocks info
-        sjoin = gdf.sjoin_nearest(self.get_towns_gdf())
-        groups = sjoin.groupby("index_right")
-        for town_id, services_gdf in groups:
-            self[town_id].update_capacity(service_type, services_gdf['capacity'].sum())
 
     def get_towns_gdf(self):
         towns = [town.to_dict() for town in self.towns]
@@ -146,11 +102,6 @@ class Region():
         return self._towns[town_id]
 
     # Make city_model subscriptable, to access service type via name like city_model['schools']
-    @__getitem__.register(str)
-    def _(self, service_type_name):
-        if not service_type_name in self._service_types:
-            raise KeyError(f"Can't find service type with such name: {service_type_name}")
-        return self._service_types[service_type_name]
 
     @__getitem__.register(tuple)
     def _(self, towns):
@@ -164,7 +115,3 @@ class Region():
     @property
     def towns(self):
         return self._towns.values()
-
-    @property
-    def service_types(self):
-        return self._service_types.values()

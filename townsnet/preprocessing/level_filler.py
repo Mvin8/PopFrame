@@ -1,5 +1,5 @@
 import geopandas as gpd
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from shapely.geometry import Point
 from typing import ClassVar
 from ..models.geodataframe import GeoDataFrame, BaseRow
