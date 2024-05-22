@@ -140,7 +140,7 @@ dmypy.json
 *.pkl
 *.graphml
 *.csv
-/townsnet/output_data
+/popframe/output_data
 
 cache/
 /examples/data

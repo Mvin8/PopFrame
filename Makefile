@@ -1,4 +1,4 @@
-SOURCE_DIR = townsnet
+SOURCE_DIR = popframe
 
 lint:
 	pylint ${SOURCE_DIR}
@@ -20,7 +20,7 @@ build:
 	python3 -m build .
 
 clean:
-	rm -rf ./build ./dist ./townsnet.egg-info
+	rm -rf ./build ./dist ./popframe.egg-info
 
 update-pypi: clean build
 	python3 -m twine upload dist/*

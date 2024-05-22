@@ -3,7 +3,7 @@
 import os
 import pytest
 import geopandas as gpd
-from townsnet import BlocksGenerator
+from popframe import BlocksGenerator
 
 data_path = "./tests/data/blocks"
 local_crs = 32637

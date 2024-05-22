@@ -20,7 +20,7 @@ from sphinx.builders.html import StandaloneHTMLBuilder
 
 # -- Project information -----------------------------------------------------
 
-project = "TownsNet"
+project = "PopFrame"
 copyright = "2023-{}, IDU".format(datetime.datetime.now().year)
 author = "IDU"
 

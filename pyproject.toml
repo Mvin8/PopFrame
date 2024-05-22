@@ -3,7 +3,7 @@ requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "townsnet"
+name = "popframe"
 version = "0.0.1"
 authors = [
     # { name = "", email = "" }, # TODO add authors
@@ -48,7 +48,7 @@ classifiers = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["townsnet*"]
+include = ["popframe*"]
 
 
 [project.optional-dependencies]
