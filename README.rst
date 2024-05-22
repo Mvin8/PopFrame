@@ -3,7 +3,7 @@ PopFrame
 
 .. logo-start
 
-.. figure:: https://i.ibb.co/tsnRrgp/DALL-E-2024-05-22-16-49-13-A-simple-logo-for-the-Python-library-Pop-Frame-which-models-the-frame-of.webp
+.. figure:: https://i.ibb.co/8bD3qr0/DALL-E-2024-05-22-16-49.png
    :alt: PopFrame logo
 
 .. logo-end
