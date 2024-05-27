@@ -3,8 +3,8 @@ import networkx as nx
 import geopandas as gpd
 import folium
 import json
-
 from ..models.region import Town
+
 from .base_method import BaseMethod
 
 class PopFrame(BaseMethod):
@@ -24,7 +24,7 @@ class PopFrame(BaseMethod):
         to_towns = towns[towns['level'].isin(to_levels)].index
 
         for idx in from_towns:
-            distances = self.region.adjacency_matrix.loc[idx, to_towns]
+            distances = self.region.accessibility_matrix.loc[idx, to_towns]
             nearest_idx = distances.idxmin()
 
             if nearest_idx and not G.has_edge(idx, nearest_idx):
@@ -41,7 +41,7 @@ class PopFrame(BaseMethod):
         for idx1 in level_idxs:
             for idx2 in level_idxs:
                 if idx1 != idx2:
-                    distance = self.region.adjacency_matrix.at[idx1, idx2]
+                    distance = self.region.accessibility_matrix.at[idx1, idx2]
                     H.add_edge(idx1, idx2, weight=distance)
 
         mst = nx.minimum_spanning_tree(H)

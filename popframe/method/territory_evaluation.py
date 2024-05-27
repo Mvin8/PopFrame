@@ -4,9 +4,10 @@ import geopandas as gpd
 from shapely.geometry import Point, MultiPolygon
 from shapely.ops import nearest_points
 from itertools import combinations
+import numpy as np
 
 
-from ..models.region import Town
+from ..models.region_old import Town
 from .base_method import BaseMethod
 
 
@@ -49,54 +50,66 @@ class TerritoryEvaluation(BaseMethod):
 
     def evaluate_territory_location(self):
         settlements_gdf = self.region.get_towns_gdf()
-        territory_gdf = self.region.territory
+        territories_gdf = self.region.get_territories_gdf()
+        
         # Преобразование системы координат
         settlements_gdf = settlements_gdf.to_crs(epsg=3857)
-        territory_gdf = territory_gdf.to_crs(epsg=3857)
+        territories_gdf = territories_gdf.to_crs(epsg=3857)
 
-        # Получение геометрии территории
-        territory_geom = territory_gdf.geometry.unary_union
+        results = []
 
-        # Фильтрация населенных пунктов второго и третьего уровней
-        settlements_filtered = settlements_gdf[
-            settlements_gdf['level'].isin(['Второй уровень', 'Третий уровень'])
-        ]
+        for territory in territories_gdf.itertuples():
+            # Получение геометрии территории
+            territory_geom = territory.geometry
 
-        # Создание буфера вокруг геометрии территории для разных уровней населенных пунктов
-        buffer_7km = territory_geom.buffer(7000)  # для 1 уровня
-        buffer_5km = territory_geom.buffer(5000)  # для 2 и 3 уровней
+            # Фильтрация населенных пунктов второго и третьего уровней
+            settlements_filtered = settlements_gdf[
+                settlements_gdf['level'].isin(['Второй уровень', 'Третий уровень'])
+            ]
 
-        # Поиск населенных пунктов внутри буферов
-        highest_score = 0
-        min_distance = float('inf')
-        closest_settlement1 = None
-        closest_settlement2 = None
-        interpretation = ""
-        closest_settlement_name = ""
+            # Создание буфера вокруг геометрии территории для разных уровней населенных пунктов
+            buffer_7km = territory_geom.buffer(7000)  # для 1 уровня
+            buffer_5km = territory_geom.buffer(5000)  # для 2 и 3 уровней
 
-        for idx, row in settlements_gdf.iterrows():
-            point_within_7km = row['geometry'].intersects(buffer_7km)
-            point_within_5km = row['geometry'].intersects(buffer_5km)
+            # Поиск населенных пунктов внутри буферов
+            highest_score = 0
+            min_distance = float('inf')
+            closest_settlement1 = None
+            closest_settlement2 = None
+            interpretation = ""
+            closest_settlement_name = ""
 
-            if point_within_7km and row['level'] == "Первый уровень":
-                if highest_score < 5:
-                    highest_score = 5
-                    interpretation = "территория находится внутри или непосредственной близости наиболее крупного населенного пункта"
-                    closest_settlement_name = row['name']
-            if point_within_5km and row['level'] == "Второй уровень":
-                if highest_score < 4:
-                    highest_score = 4
-                    interpretation = "территория находится внутри или непосредственной близости крупного населенного пункта"
-                    closest_settlement_name = row['name']
-            if point_within_5km and row['level'] == "Третий уровень":
-                if highest_score < 3:
-                    highest_score = 3
-                    interpretation = "территория находится внутри или непосредственной близости небольшого населенного пункта"
-                    closest_settlement_name = row['name']
+            for idx, row in settlements_gdf.iterrows():
+                point_within_7km = row['geometry'].intersects(buffer_7km)
+                point_within_5km = row['geometry'].intersects(buffer_5km)
 
-        if highest_score > 0:
-            return highest_score, interpretation, closest_settlement_name, None, None
-        else:
+                if point_within_7km and row['level'] == "Первый уровень":
+                    if highest_score < 5:
+                        highest_score = 5
+                        interpretation = "территория находится внутри или непосредственной близости наиболее крупного населенного пункта"
+                        closest_settlement_name = row['name']
+                if point_within_5km and row['level'] == "Второй уровень":
+                    if highest_score < 4:
+                        highest_score = 4
+                        interpretation = "территория находится внутри или непосредственной близости крупного населенного пункта"
+                        closest_settlement_name = row['name']
+                if point_within_5km and row['level'] == "Третий уровень":
+                    if highest_score < 3:
+                        highest_score = 3
+                        interpretation = "территория находится внутри или непосредственной близости небольшого населенного пункта"
+                        closest_settlement_name = row['name']
+
+            if highest_score > 0:
+                results.append({
+                    "territory": territory.name,
+                    "score": highest_score,
+                    "interpretation": interpretation,
+                    "closest_settlement": closest_settlement_name,
+                    "closest_settlement1": None,
+                    "closest_settlement2": None
+                })
+                continue
+
             # Приоритет отдаётся населенным пунктам второго уровня с расстоянием между ними не более 50,000 метров
             for settlement1, settlement2 in combinations(settlements_filtered.itertuples(), 2):
                 distance_between_settlements = settlement1.geometry.distance(settlement2.geometry)
@@ -125,7 +138,7 @@ class TerritoryEvaluation(BaseMethod):
                         distance_to_settlement1 = territory_geom.distance(settlement1.geometry)
                         distance_to_settlement2 = territory_geom.distance(settlement2.geometry)
                         total_distance = distance_to_settlement1 + distance_to_settlement2
-                        
+
                         if (distance_to_settlement1 > 5000 and distance_to_settlement2 > 5000 and
                                 total_distance <= 1.2 * distance_between_settlements and
                                 total_distance < min_distance):
@@ -137,11 +150,100 @@ class TerritoryEvaluation(BaseMethod):
 
             # Возвращение результатов, если найдена подходящая пара
             if closest_settlement1 and closest_settlement2:
-                return highest_score, interpretation, None, closest_settlement1.name,  closest_settlement2.name,
+                results.append({
+                    "territory": territory.name,
+                    "score": highest_score,
+                    "interpretation": interpretation,
+                    "closest_settlement": None,
+                    "closest_settlement1": closest_settlement1.name,
+                    "closest_settlement2": closest_settlement2.name
+                })
+            else:
+                results.append({
+                    "territory": territory.name,
+                    "score": 0,
+                    "interpretation": "Территория находится за границей агломерации",
+                    "closest_settlement": None,
+                    "closest_settlement1": None,
+                    "closest_settlement2": None
+                })
+
+        return results
+    
+    def population_criterion(self, merged_gdf,):
+        # Преобразование данных в систему координат 3857
+        assessment_score = 3
+        gdf_territory = self.region.get_territories_gdf().to_crs(epsg=3857)
+        gdf_municipalities = merged_gdf.to_crs(epsg=3857)
+
+        # Функция для вычисления средней плотности населения и среднего прироста населения в радиусе 60 км
+        def _calculate_density_growth(gdf_territory, gdf_municipalities, radius_m=60000):
+            results = []
             
-            # Если территория не соответствует условиям, возвращаем только False
-            return 0, "Территория находится за границей агломерации", None, None, None
+            for _, territory in gdf_territory.iterrows():
+                buffer = territory.geometry.buffer(radius_m)
+                municipalities_in_buffer = gdf_municipalities[gdf_municipalities.intersects(buffer)]
 
+                municipalities_filtered = [m for _, m in municipalities_in_buffer.iterrows()
+                                        if m.geometry.intersection(buffer).area / m.geometry.area >= 0.15]
 
-    # def population_criterion(self):
+                if municipalities_filtered:
+                    densities = [m['density_2022'] for m in municipalities_filtered]
+                    growths = [m['growth_2022'] for m in municipalities_filtered]
+                    avg_density = np.mean(densities)
+                    avg_growth = np.mean(growths)
+                    results.append({
+                        'Проект': territory['name'],
+                        'Средняя плотность населения (чел. на кв.км.)': round(avg_density, 1),
+                        'Средний прирост населения': round(avg_growth, 1)
+                    })
+            return results
+
+        # Применение функции к нашим данным
+        results = _calculate_density_growth(gdf_territory, gdf_municipalities)
+
+        score_table = {
+            (5, 'Меньше 10 чел на кв. км.', 'Убыль'): 2,
+            (5, 'Меньше 10 чел на кв. км.', 'Рост'): 4,
+            (5, '10 – 50 чел на кв. км.', 'Убыль'): 3,
+            (5, '10 – 50 чел на кв. км.', 'Рост'): 5,
+            (5, 'Более 50 чел. на кв. км.', 'Убыль'): 4,
+            (5, 'Более 50 чел. на кв. км.', 'Рост'): 5,
+            (4, 'Меньше 10 чел на кв. км.', 'Убыль'): 2,
+            (4, 'Меньше 10 чел на кв. км.', 'Рост'): 4,
+            (4, '10 – 50 чел на кв. км.', 'Убыль'): 3,
+            (4, '10 – 50 чел на кв. км.', 'Рост'): 4,
+            (4, 'Более 50 чел. на кв. км.', 'Убыль'): 4,
+            (4, 'Более 50 чел. на кв. км.', 'Рост'): 5,
+            (3, 'Меньше 10 чел на кв. км.', 'Убыль'): 2,
+            (3, 'Меньше 10 чел на кв. км.', 'Рост'): 3,
+            (3, '10 – 50 чел на кв. км.', 'Убыль'): 2,
+            (3, '10 – 50 чел на кв. км.', 'Рост'): 3,
+            (3, 'Более 50 чел. на кв. км.', 'Убыль'): 3,
+            (3, 'Более 50 чел. на кв. км.', 'Рост'): 4,
+            (2, 'Меньше 10 чел на кв. км.', 'Убыль'): 1,
+            (2, 'Меньше 10 чел на кв. км.', 'Рост'): 2,
+            (2, '10 – 50 чел на кв. км.', 'Убыль'): 1,
+            (2, '10 – 50 чел на кв. км.', 'Рост'): 2,
+            (2, 'Более 50 чел. на кв. км.', 'Убыль'): 2,
+            (2, 'Более 50 чел. на кв. км.', 'Рост'): 3,
+        }
+
+        def _assess_territory(density, growth, assessment_score):
+            growth_status = 'Убыль' if growth < 0 else 'Рост'
+            if density < 10:
+                density_status = 'Меньше 10 чел на кв. км.'
+            elif 10 <= density <= 50:
+                density_status = '10 – 50 чел на кв. км.'
+            else:
+                density_status = 'Более 50 чел. на кв. км.'
+
+            return score_table.get((assessment_score, density_status, growth_status), 0)
+        
+        for result in results:
+            result['Оценка'] = _assess_territory(result['Средняя плотность населения (чел. на кв.км.)'], result['Средний прирост населения'], assessment_score)
+
+        return results
+
+        
 
