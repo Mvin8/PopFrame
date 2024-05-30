@@ -27,7 +27,7 @@ dependencies = [
     "pandas==1.5.3",
     "PuLP==2.7.0",
     "pyarrow==12.0.0",
-    "pydantic==2.0",
+    "pydantic==2.7.2",
     "pylint==2.17.4",
     "pygad==3.1.0",
     "requests==2.31.0",
@@ -66,8 +66,8 @@ dev = [
 
 
 [project.urls]
-"Repository" = "https://github.com/vasilstar97/townsnet"
-"Bug Tracker" = "https://github.com/vasilstar97/townsnet/issues"
+"Repository" = "https://github.com/Mvin8/PopFrame/"
+"Bug Tracker" = "https://github.com/Mvin8/PopFrame/issues"
 
 
 [tool.black]

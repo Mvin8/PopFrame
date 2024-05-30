@@ -168,6 +168,8 @@ class TerritoryEvaluation(BaseMethod):
                     "closest_settlement2": None
                 })
 
+                
+
         return results
     
     def population_criterion(self, merged_gdf,):
