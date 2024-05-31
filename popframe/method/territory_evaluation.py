@@ -6,6 +6,9 @@ from shapely.ops import nearest_points
 from itertools import combinations
 import numpy as np
 
+import json
+from io import StringIO
+
 
 from ..models.region_old import Town
 from .base_method import BaseMethod
@@ -14,20 +17,67 @@ from .base_method import BaseMethod
 class TerritoryEvaluation(BaseMethod):
 
     @classmethod
-    def _is_criterion_satisfied(self, profile_value, criterion_value):
+    def _is_criterion_satisfied(cls, profile_value, criterion_value):
         if isinstance(profile_value, tuple):
             return profile_value[0] <= criterion_value <= profile_value[1]
         return criterion_value >= profile_value
-        
+
     @classmethod
-    def _calculate_exceedance(self, profile_value, criterion_value):
+    def _calculate_exceedance(cls, profile_value, criterion_value):
         if isinstance(profile_value, tuple):
             if profile_value[0] <= criterion_value <= profile_value[1]:
                 return criterion_value - profile_value[0]
             return 0
         return max(0, criterion_value - profile_value)
 
-    def calculate_potential(self, profiles, criteria_values):
+    def calculate_potential(self, criteria_values):
+        profiles = {
+            "Жилая застройка - ИЖС": {
+                "criteria": {"Население": 1, "Транспорт": 2, "Экология": 4, "Соц-об": 4, "Инж инф": 3, "Кул-дос-сп": 0},
+                "weights": {"Население": 0, "Транспорт": 0, "Экология": 1, "Соц-об": 1, "Инж инф": 0, "Кул-дос-сп": 0}
+            },
+            "Жилая застройка - Малоэтажная": {
+                "criteria": {"Население": 3, "Транспорт": 3, "Экология": 4, "Соц-об": 5, "Инж инф": 4, "Кул-дос-сп": 1},
+                "weights": {"Население": 0, "Транспорт": 0, "Экология": 1, "Соц-об": 1, "Инж инф": 1, "Кул-дос-сп": 0}
+            },
+            "Жилая застройка - Среднеэтажная": {
+                "criteria": {"Население": 4, "Транспорт": 4, "Экология": 4, "Соц-об": 4, "Инж инф": 5, "Кул-дос-сп": 2},
+                "weights": {"Население": 1, "Транспорт": 1, "Экология": 1, "Соц-об": 1, "Инж инф": 1, "Кул-дос-сп": 0}
+            },
+            "Жилая застройка - Многоэтажная": {
+                "criteria": {"Население": (4, 5), "Транспорт": 5, "Экология": 4, "Соц-об": 5, "Инж инф": 5, "Кул-дос-сп": 3},
+                "weights": {"Население": 1, "Транспорт": 1, "Экология": 1, "Соц-об": 1, "Инж инф": 1, "Кул-дос-сп": 0}
+            },
+            "Общественно-деловая": {
+                "criteria": {"Население": 4, "Транспорт": 5, "Экология": 4, "Соц-об": 2, "Инж инф": 5, "Кул-дос-сп": 3},
+                "weights": {"Население": 1, "Транспорт": 1, "Экология": 1, "Соц-об": 0, "Инж инф": 1, "Кул-дос-сп": 0}
+            },
+            "Рекреационная": {
+                "criteria": {"Население": 0, "Транспорт": 0, "Экология": 0, "Соц-об": 0, "Инж инф": 0, "Кул-дос-сп": 0},
+                "weights": {"Население": 0, "Транспорт": 0, "Экология": 0, "Соц-об": 0, "Инж инф": 0, "Кул-дос-сп": 0}
+            },
+            "Специального назначения - медицинский центр": {
+                "criteria": {"Население": 4, "Транспорт": 4, "Экология": 5, "Соц-об": 0, "Инж инф": 5, "Кул-дос-сп": 0},
+                "weights": {"Население": 1, "Транспорт": 1, "Экология": 1, "Соц-об": 0, "Инж инф": 1, "Кул-дос-сп": 0}
+            },
+            "Специального назначения - туристический кластер": {
+                "criteria": {"Население": 3, "Транспорт": 3, "Экология": 5, "Соц-об": 1, "Инж инф": 3, "Кул-дос-сп": 0},
+                "weights": {"Население": 0, "Транспорт": 0, "Экология": 1, "Соц-об": 0, "Инж инф": 0, "Кул-дос-сп": 0}
+            },
+            "Промышленная": {
+                "criteria": {"Население": (3, 4), "Транспорт": 4, "Экология": 0, "Соц-об": 1, "Инж инф": 4, "Кул-дос-сп": 2},
+                "weights": {"Население": 1, "Транспорт": 1, "Экология": 0, "Соц-об": 0, "Инж инф": 1, "Кул-дос-сп": 0}
+            },
+            "Сельско-хозяйственная": {
+                "criteria": {"Население": (2, 3), "Транспорт": 3, "Экология": (4, 5), "Соц-об": 3, "Инж инф": (2, 3), "Кул-дос-сп": 2},
+                "weights": {"Население": 0, "Транспорт": 0, "Экология": 1, "Соц-об": 0, "Инж инф": 0, "Кул-дос-сп": 0}
+            },
+            "Транспортная инженерная": {
+                "criteria": {"Население": (1, 2), "Транспорт": 0, "Экология": 0, "Соц-об": 0, "Инж инф": 2, "Кул-дос-сп": 0},
+                "weights": {"Население": 0, "Транспорт": 0, "Экология": 0, "Соц-об": 0, "Инж инф": 0, "Кул-дос-сп": 0}
+            }
+        }
+
         potential_scores = {}
         for profile, data in profiles.items():
             criteria = data["criteria"]
@@ -48,9 +98,13 @@ class TerritoryEvaluation(BaseMethod):
         return ranked_profiles
 
 
-    def evaluate_territory_location(self):
+    def evaluate_territory_location(self, territories):
         settlements_gdf = self.region.get_towns_gdf()
-        territories_gdf = self.region.get_territories_gdf()
+        if territories is None:
+            territories_gdf = self.region.get_territories_gdf()
+        else:
+            territories = json.dumps(territories)
+            territories_gdf = gpd.read_file(StringIO(territories))
         
         # Преобразование системы координат
         settlements_gdf = settlements_gdf.to_crs(epsg=3857)
@@ -172,10 +226,14 @@ class TerritoryEvaluation(BaseMethod):
 
         return results
     
-    def population_criterion(self, merged_gdf,):
+    def population_criterion(self, merged_gdf, territories):
         # Преобразование данных в систему координат 3857
         assessment_score = 3
-        gdf_territory = self.region.get_territories_gdf().to_crs(epsg=3857)
+        if territories is None:
+            gdf_territory = self.region.get_territories_gdf().to_crs(epsg=3857)
+        else:
+            territories = json.dumps(territories)
+            gdf_territory = gpd.read_file(StringIO(territories)).to_crs(epsg=3857)
         gdf_municipalities = merged_gdf.to_crs(epsg=3857)
 
         # Функция для вычисления средней плотности населения и среднего прироста населения в радиусе 60 км
@@ -195,13 +253,12 @@ class TerritoryEvaluation(BaseMethod):
                     avg_density = np.mean(densities)
                     avg_growth = np.mean(growths)
                     results.append({
-                        'Проект': territory['name'],
-                        'Средняя плотность населения (чел. на кв.км.)': round(avg_density, 1),
-                        'Средний прирост населения': round(avg_growth, 1)
+                        'project': territory['name'],
+                        'average_population_density': round(avg_density, 1),
+                        'average_population_growth': round(avg_growth, 1)
                     })
             return results
 
-        # Применение функции к нашим данным
         results = _calculate_density_growth(gdf_territory, gdf_municipalities)
 
         score_table = {
@@ -243,7 +300,7 @@ class TerritoryEvaluation(BaseMethod):
             return score_table.get((assessment_score, density_status, growth_status), 0)
         
         for result in results:
-            result['Оценка'] = _assess_territory(result['Средняя плотность населения (чел. на кв.км.)'], result['Средний прирост населения'], assessment_score)
+            result['score'] = _assess_territory(result['average_population_density'], result['average_population_growth'], assessment_score)
 
         return results
 

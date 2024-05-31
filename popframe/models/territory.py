@@ -10,7 +10,6 @@ class Territory(BaseModel):
   name : str
   geometry : InstanceOf[shapely.Polygon]
 
-
   def to_dict(self):
     return {
       'id': self.id,
