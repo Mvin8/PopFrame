@@ -141,6 +141,7 @@ dmypy.json
 *.graphml
 *.csv
 /popframe/output_data
+9 регионов
 
 cache/
 /examples/data
