@@ -32,7 +32,7 @@ data
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
-
+Karkas_ready
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -50,10 +50,11 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
-
+data_9
 # Translations
 *.mo
 *.pot
+city_frames_24_05
 
 # Django stuff:
 *.log
