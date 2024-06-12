@@ -55,7 +55,7 @@ data_9
 *.mo
 *.pot
 city_frames_24_05
-
+urban
 # Django stuff:
 *.log
 local_settings.py
