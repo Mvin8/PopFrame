@@ -101,27 +101,32 @@ class TerritoryEvaluation(BaseMethod):
         else:
             territories = json.dumps(territories)
             territories_gdf = gpd.read_file(StringIO(territories))
-        
+
         # Преобразование системы координат
         settlements_gdf = settlements_gdf.to_crs(epsg=3857)
         territories_gdf = territories_gdf.to_crs(epsg=3857)
 
         results = []
 
+        # Определение буферов для каждого уровня
+        buffer_distances = {
+            "Сверхкрупный город": 10000,
+            "Крупнейший город": 9000,
+            "Крупный город": 8000,
+            "Большой город": 7000,
+            "Средний город": 6000,
+            "Малый город": 5000,
+            "Крупное сельское поселение": 4000,
+            "Большое сельское поселение": 3000,
+            "Среднее сельское поселение": 2000,
+            "Малое сельское поселение": 1000,
+        }
+
         for territory in territories_gdf.itertuples():
             # Получение геометрии территории
             territory_geom = territory.geometry
 
-            # Фильтрация населенных пунктов второго и третьего уровней
-            settlements_filtered = settlements_gdf[
-                settlements_gdf['level'].isin(['Второй уровень', 'Третий уровень'])
-            ]
-
-            # Создание буфера вокруг геометрии территории для разных уровней населенных пунктов
-            buffer_7km = territory_geom.buffer(7000)  # для 1 уровня
-            buffer_5km = territory_geom.buffer(5000)  # для 2 и 3 уровней
-
-            # Поиск населенных пунктов внутри буферов
+            # Инициализация переменных для результатов
             highest_score = 0
             min_distance = float('inf')
             closest_settlement1 = None
@@ -129,74 +134,58 @@ class TerritoryEvaluation(BaseMethod):
             interpretation = ""
             closest_settlement_name = ""
 
-            for idx, row in settlements_gdf.iterrows():
-                point_within_7km = row['geometry'].intersects(buffer_7km)
-                point_within_5km = row['geometry'].intersects(buffer_5km)
+            # # Поиск населенных пунктов внутри буферов
+            # for idx, row in settlements_gdf.iterrows():
+            #     level = row['level']
+            #     buffer_distance = buffer_distances.get(level, 5000)
+            #     buffer = territory_geom.buffer(buffer_distance)
+            #     point_within_buffer = row['geometry'].intersects(buffer)
 
-                if point_within_7km and row['level'] == "Первый уровень":
-                    if highest_score < 5:
-                        highest_score = 5
-                        interpretation = "территория находится внутри или непосредственной близости наиболее крупного населенного пункта"
-                        closest_settlement_name = row['name']
-                if point_within_5km and row['level'] == "Второй уровень":
-                    if highest_score < 4:
-                        highest_score = 4
-                        interpretation = "территория находится внутри или непосредственной близости крупного населенного пункта"
-                        closest_settlement_name = row['name']
-                if point_within_5km and row['level'] == "Третий уровень":
-                    if highest_score < 3:
-                        highest_score = 3
-                        interpretation = "территория находится внутри или непосредственной близости небольшого населенного пункта"
-                        closest_settlement_name = row['name']
+            #     if point_within_buffer:
+            #         level_scores = {
+            #             "Сверхкрупный город": 10,
+            #             "Крупнейший город": 9,
+            #             "Крупный город": 8,
+            #             "Большой город": 7,
+            #             "Средний город": 6,
+            #             "Малый город": 5,
+            #             "Крупное сельское поселение": 4,
+            #             "Большое сельское поселение": 3,
+            #             "Среднее сельское поселение": 2,
+            #             "Малое сельское поселение": 1,
+            #         }
+            #         score = level_scores.get(level, 0)
+            #         if score > highest_score:
+            #             highest_score = score
+            #             interpretation = f"территория находится внутри или непосредственной близости населенного пункта уровня {level}"
+            #             closest_settlement_name = row['name']
 
-            if highest_score > 0:
-                results.append({
-                    "territory": territory.name,
-                    "score": highest_score,
-                    "interpretation": interpretation,
-                    "closest_settlement": closest_settlement_name,
-                    "closest_settlement1": None,
-                    "closest_settlement2": None
-                })
-                continue
+            # if highest_score > 0:
+            #     results.append({
+            #         "territory": territory.name,
+            #         "score": highest_score,
+            #         "interpretation": interpretation,
+            #         "closest_settlement": closest_settlement_name,
+            #         "closest_settlement1": None,
+            #         "closest_settlement2": None
+            #     })
+            #     continue
 
-            # Приоритет отдаётся населенным пунктам второго уровня с расстоянием между ними не более 50,000 метров
-            for settlement1, settlement2 in combinations(settlements_filtered.itertuples(), 2):
+            # Проверка пар населенных пунктов
+            for settlement1, settlement2 in combinations(settlements_gdf.itertuples(), 2):
                 distance_between_settlements = settlement1.geometry.distance(settlement2.geometry)
+                distance_to_settlement1 = territory_geom.distance(settlement1.geometry)
+                distance_to_settlement2 = territory_geom.distance(settlement2.geometry)
+                total_distance = distance_to_settlement1 + distance_to_settlement2
 
-                # Рассчитывать только для второго уровня, если расстояние между пунктами <= 50,000 метров
-                if settlement1.level == 'Второй уровень' and settlement2.level == 'Второй уровень' and distance_between_settlements <= 50000:
-                    distance_to_settlement1 = territory_geom.distance(settlement1.geometry)
-                    distance_to_settlement2 = territory_geom.distance(settlement2.geometry)
-                    total_distance = distance_to_settlement1 + distance_to_settlement2
-
-                    # Проверка условий и обновление минимального расстояния
-                    if (distance_to_settlement1 > 5000 and distance_to_settlement2 > 5000 and
-                            total_distance <= 1.2 * distance_between_settlements and
-                            total_distance < min_distance):
-                        min_distance = total_distance
-                        closest_settlement1 = settlement1
-                        closest_settlement2 = settlement2
-                        highest_score = 2
-                        interpretation = "территория находится между основными ядрами системы расселения"
-
-            # Проверка населенных пунктов третьего уровня, если не найдено подходящих пар второго уровня
-            if not closest_settlement1:
-                for settlement1, settlement2 in combinations(settlements_filtered.itertuples(), 2):
-                    distance_between_settlements = settlement1.geometry.distance(settlement2.geometry)
-                    if settlement1.level == 'Третий уровень' and settlement2.level == 'Третий уровень' and distance_between_settlements <= 30000:
-                        distance_to_settlement1 = territory_geom.distance(settlement1.geometry)
-                        distance_to_settlement2 = territory_geom.distance(settlement2.geometry)
-                        total_distance = distance_to_settlement1 + distance_to_settlement2
-
-                        if (distance_to_settlement1 > 5000 and distance_to_settlement2 > 5000 and
-                                total_distance <= 1.2 * distance_between_settlements and
-                                total_distance < min_distance):
-                            min_distance = total_distance
-                            closest_settlement1 = settlement1
-                            closest_settlement2 = settlement2
-                            highest_score = 1
-                            interpretation = "территория находится между незначительными ядрами системы расселения"
+                if (distance_to_settlement1 > 5000 and distance_to_settlement2 > 5000 and
+                        total_distance <= 1.2 * distance_between_settlements and
+                        total_distance < min_distance):
+                    min_distance = total_distance
+                    closest_settlement1 = settlement1
+                    closest_settlement2 = settlement2
+                    highest_score = 1
+                    interpretation = "территория находится между основными ядрами системы расселения"
 
             # Возвращение результатов, если найдена подходящая пара
             if closest_settlement1 and closest_settlement2:
@@ -218,9 +207,149 @@ class TerritoryEvaluation(BaseMethod):
                     "closest_settlement2": None
                 })
 
-                
-
         return results
+
+    # def evaluate_territory_location(self, territories):
+    #     # Mapping new levels to the original three levels
+    #     level_mapping = {
+    #         "Сверхкрупный город": "Первый уровень",
+    #         "Крупнейший город": "Первый уровень",
+    #         "Крупный город": "Первый уровень",
+    #         "Большой город": "Второй уровень",
+    #         "Средний город": "Второй уровень",
+    #         "Малый город": "Второй уровень",
+    #         "Крупное сельское поселение": "Третий уровень",
+    #         "Большое сельское поселение": "Третий уровень",
+    #         "Среднее сельское поселение": "Третий уровень",
+    #         "Малое сельское поселение": "Третий уровень"
+    #     }
+
+    #     settlements_gdf = self.region.get_towns_gdf()
+    #     settlements_gdf['level'] = settlements_gdf['level'].map(level_mapping)
+
+    #     if territories is None:
+    #         territories_gdf = self.region.get_territories_gdf()
+    #     else:
+    #         territories = json.dumps(territories)
+    #         territories_gdf = gpd.read_file(StringIO(territories))
+
+    #     # Преобразование системы координат
+    #     settlements_gdf = settlements_gdf.to_crs(epsg=3857)
+    #     territories_gdf = territories_gdf.to_crs(epsg=3857)
+
+    #     results = []
+
+    #     for territory in territories_gdf.itertuples():
+    #         # Получение геометрии территории
+    #         territory_geom = territory.geometry
+
+    #         # Фильтрация населенных пунктов второго и третьего уровней
+    #         settlements_filtered = settlements_gdf[
+    #             settlements_gdf['level'].isin(['Второй уровень', 'Третий уровень'])
+    #         ]
+
+    #         # Создание буфера вокруг геометрии территории для разных уровней населенных пунктов
+    #         buffer_7km = territory_geom.buffer(7000)  # для 1 уровня
+    #         buffer_5km = territory_geom.buffer(5000)  # для 2 и 3 уровней
+
+    #         # Поиск населенных пунктов внутри буферов
+    #         highest_score = 0
+    #         min_distance = float('inf')
+    #         closest_settlement1 = None
+    #         closest_settlement2 = None
+    #         interpretation = ""
+    #         closest_settlement_name = ""
+
+    #         for idx, row in settlements_gdf.iterrows():
+    #             point_within_7km = row['geometry'].intersects(buffer_7km)
+    #             point_within_5km = row['geometry'].intersects(buffer_5km)
+
+    #             if point_within_7km and row['level'] == "Первый уровень":
+    #                 if highest_score < 5:
+    #                     highest_score = 5
+    #                     interpretation = "территория находится внутри или непосредственной близости наиболее крупного населенного пункта"
+    #                     closest_settlement_name = row['name']
+    #             if point_within_5km and row['level'] == "Второй уровень":
+    #                 if highest_score < 4:
+    #                     highest_score = 4
+    #                     interpretation = "территория находится внутри или непосредственной близости крупного населенного пункта"
+    #                     closest_settlement_name = row['name']
+    #             if point_within_5km and row['level'] == "Третий уровень":
+    #                 if highest_score < 3:
+    #                     highest_score = 3
+    #                     interpretation = "территория находится внутри или непосредственной близости небольшого населенного пункта"
+    #                     closest_settlement_name = row['name']
+
+    #         if highest_score > 0:
+    #             results.append({
+    #                 "territory": territory.name,
+    #                 "score": highest_score,
+    #                 "interpretation": interpretation,
+    #                 "closest_settlement": closest_settlement_name,
+    #                 "closest_settlement1": None,
+    #                 "closest_settlement2": None
+    #             })
+    #             continue
+
+    #         # Приоритет отдаётся населенным пунктам второго уровня с расстоянием между ними не более 50,000 метров
+    #         for settlement1, settlement2 in combinations(settlements_filtered.itertuples(), 2):
+    #             distance_between_settlements = settlement1.geometry.distance(settlement2.geometry)
+
+    #             # Рассчитывать только для второго уровня, если расстояние между пунктами <= 50,000 метров
+    #             if settlement1.level == 'Второй уровень' and settlement2.level == 'Второй уровень' and distance_between_settlements <= 50000:
+    #                 distance_to_settlement1 = territory_geom.distance(settlement1.geometry)
+    #                 distance_to_settlement2 = territory_geom.distance(settlement2.geometry)
+    #                 total_distance = distance_to_settlement1 + distance_to_settlement2
+
+    #                 # Проверка условий и обновление минимального расстояния
+    #                 if (distance_to_settlement1 > 5000 and distance_to_settlement2 > 5000 and
+    #                         total_distance <= 1.2 * distance_between_settlements and
+    #                         total_distance < min_distance):
+    #                     min_distance = total_distance
+    #                     closest_settlement1 = settlement1
+    #                     closest_settlement2 = settlement2
+    #                     highest_score = 2
+    #                     interpretation = "территория находится между основными ядрами системы расселения"
+
+    #         # Проверка населенных пунктов третьего уровня, если не найдено подходящих пар второго уровня
+    #         if not closest_settlement1:
+    #             for settlement1, settlement2 in combinations(settlements_filtered.itertuples(), 2):
+    #                 distance_between_settlements = settlement1.geometry.distance(settlement2.geometry)
+    #                 if settlement1.level == 'Третий уровень' and settlement2.level == 'Третий уровень' and distance_between_settlements <= 30000:
+    #                     distance_to_settlement1 = territory_geom.distance(settlement1.geometry)
+    #                     distance_to_settlement2 = territory_geom.distance(settlement2.geometry)
+    #                     total_distance = distance_to_settlement1 + distance_to_settlement2
+
+    #                     if (distance_to_settlement1 > 5000 and distance_to_settlement2 > 5000 and
+    #                             total_distance <= 1.2 * distance_between_settlements and
+    #                             total_distance < min_distance):
+    #                         min_distance = total_distance
+    #                         closest_settlement1 = settlement1
+    #                         closest_settlement2 = settlement2
+    #                         highest_score = 1
+    #                         interpretation = "территория находится между незначительными ядрами системы расселения"
+
+    #         # Возвращение результатов, если найдена подходящая пара
+    #         if closest_settlement1 and closest_settlement2:
+    #             results.append({
+    #                 "territory": territory.name,
+    #                 "score": highest_score,
+    #                 "interpretation": interpretation,
+    #                 "closest_settlement": None,
+    #                 "closest_settlement1": closest_settlement1.name,
+    #                 "closest_settlement2": closest_settlement2.name
+    #             })
+    #         else:
+    #             results.append({
+    #                 "territory": territory.name,
+    #                 "score": 0,
+    #                 "interpretation": "Территория находится за границей агломерации",
+    #                 "closest_settlement": None,
+    #                 "closest_settlement1": None,
+    #                 "closest_settlement2": None
+    #             })
+
+    #     return results
     
     def population_criterion(self, merged_gdf, territories):
         # Преобразование данных в систему координат 3857
