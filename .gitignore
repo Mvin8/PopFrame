@@ -50,12 +50,9 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
-data_9
 # Translations
 *.mo
 *.pot
-city_frames_24_05
-urban
 # Django stuff:
 *.log
 local_settings.py
@@ -135,17 +132,20 @@ dmypy.json
 /mp_data
 
 # data
-# *.pickle
-# *.parquet
-# *.geojson
+*.pickle
+*.parquet
+*.geojson
 *.pkl
+*.html
 *.graphml
 *.csv
 /popframe/output_data
 9 регионов
-
+data_9
 cache/
 /examples/data
+city_frames_24_05
+urban
 
 # PyCharm env
 .idea

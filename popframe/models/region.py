@@ -98,10 +98,11 @@ class Region():
         # Plot districts
         districts_plot = self.districts.plot(ax=ax, facecolor='none', edgecolor=DISTRICTS_PLOT_COLOR, linewidth=1, label='Districts')
         
-        # # Plot territories
-        # territories_gdf = self.get_territories_gdf()
-        # territories_gdf.geometry = territories_gdf.representative_point()
-        # territories_plot = territories_gdf.plot(ax=ax, marker="H", markersize=600, color=TERRITORIES_PLOT_COLOR, alpha=0.9, label='Territories')
+        # Plot territories
+        territories_gdf = self.get_territories_gdf()
+        if territories_gdf is not None:
+            territories_gdf.geometry = territories_gdf.representative_point()
+            territories_plot = territories_gdf.plot(ax=ax, marker="H", markersize=600, color=TERRITORIES_PLOT_COLOR, alpha=0.9, label='Territories')
 
         # Additional settings for better visualization
         ax.set_axis_off()
