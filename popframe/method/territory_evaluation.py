@@ -134,42 +134,42 @@ class TerritoryEvaluation(BaseMethod):
             interpretation = ""
             closest_settlement_name = ""
 
-            # # Поиск населенных пунктов внутри буферов
-            # for idx, row in settlements_gdf.iterrows():
-            #     level = row['level']
-            #     buffer_distance = buffer_distances.get(level, 5000)
-            #     buffer = territory_geom.buffer(buffer_distance)
-            #     point_within_buffer = row['geometry'].intersects(buffer)
+            # Поиск населенных пунктов внутри буферов
+            for idx, row in settlements_gdf.iterrows():
+                level = row['level']
+                buffer_distance = buffer_distances.get(level, 5000)
+                buffer = territory_geom.buffer(buffer_distance)
+                point_within_buffer = row['geometry'].intersects(buffer)
 
-            #     if point_within_buffer:
-            #         level_scores = {
-            #             "Сверхкрупный город": 10,
-            #             "Крупнейший город": 9,
-            #             "Крупный город": 8,
-            #             "Большой город": 7,
-            #             "Средний город": 6,
-            #             "Малый город": 5,
-            #             "Крупное сельское поселение": 4,
-            #             "Большое сельское поселение": 3,
-            #             "Среднее сельское поселение": 2,
-            #             "Малое сельское поселение": 1,
-            #         }
-            #         score = level_scores.get(level, 0)
-            #         if score > highest_score:
-            #             highest_score = score
-            #             interpretation = f"территория находится внутри или непосредственной близости населенного пункта уровня {level}"
-            #             closest_settlement_name = row['name']
+                if point_within_buffer:
+                    level_scores = {
+                        "Сверхкрупный город": 10,
+                        "Крупнейший город": 9,
+                        "Крупный город": 8,
+                        "Большой город": 7,
+                        "Средний город": 6,
+                        "Малый город": 5,
+                        "Крупное сельское поселение": 4,
+                        "Большое сельское поселение": 3,
+                        "Среднее сельское поселение": 2,
+                        "Малое сельское поселение": 1,
+                    }
+                    score = level_scores.get(level, 0)
+                    if score > highest_score:
+                        highest_score = score
+                        interpretation = f"территория находится внутри или непосредственной близости населенного пункта уровня {level}"
+                        closest_settlement_name = row['name']
 
-            # if highest_score > 0:
-            #     results.append({
-            #         "territory": territory.name,
-            #         "score": highest_score,
-            #         "interpretation": interpretation,
-            #         "closest_settlement": closest_settlement_name,
-            #         "closest_settlement1": None,
-            #         "closest_settlement2": None
-            #     })
-            #     continue
+            if highest_score > 0:
+                results.append({
+                    "territory": territory.name,
+                    "score": highest_score,
+                    "interpretation": interpretation,
+                    "closest_settlement": closest_settlement_name,
+                    "closest_settlement1": None,
+                    "closest_settlement2": None
+                })
+                continue
 
             # Проверка пар населенных пунктов
             for settlement1, settlement2 in combinations(settlements_gdf.itertuples(), 2):

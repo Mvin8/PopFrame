@@ -55,20 +55,22 @@ class PopFrame(BaseMethod):
     def _connect_same_level(self, towns: gpd.GeoDataFrame, G: nx.Graph, level: str):
         """Connects nodes within the same level using Kruskal's algorithm"""
         level_idxs = towns[towns['level'] == level].index
-        H = nx.Graph()
 
-        for idx in level_idxs:
-            H.add_node(idx)
+        if len(level_idxs) > 1:
+            H = nx.Graph()
 
-        for idx1 in level_idxs:
-            for idx2 in level_idxs:
-                if idx1 != idx2:
-                    distance = self.region.accessibility_matrix.at[idx1, idx2]
-                    H.add_edge(idx1, idx2, weight=distance)
+            for idx in level_idxs:
+                H.add_node(idx)
 
-        mst = nx.minimum_spanning_tree(H)
-        for edge in mst.edges(data=True):
-            G.add_edge(edge[0], edge[1], level=level)
+            for idx1 in level_idxs:
+                for idx2 in level_idxs:
+                    if idx1 != idx2:
+                        distance = self.region.accessibility_matrix.at[idx1, idx2]
+                        H.add_edge(idx1, idx2, weight=distance)
+
+            mst = nx.minimum_spanning_tree(H)
+            for edge in mst.edges(data=True):
+                G.add_edge(edge[0], edge[1], level=level)
 
     def build_network(self) -> nx.Graph:
         towns = self.region.get_towns_gdf().to_crs(4326)
@@ -92,8 +94,8 @@ class PopFrame(BaseMethod):
             to_levels = levels[i + 1:]
             self._connect_levels(towns, G, from_level, to_levels)
 
-        # for level in levels:
-        #     self._connect_same_level(towns, G, level)
+        highest_level = max(towns['level'], key=lambda level: levels.index(level))
+        self._connect_same_level(towns, G, highest_level)
 
         return G
 
