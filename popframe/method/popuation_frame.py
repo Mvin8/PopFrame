@@ -1,4 +1,5 @@
 from typing import List
+import numpy as np
 import networkx as nx
 import geopandas as gpd
 import folium
@@ -6,6 +7,7 @@ import json
 from ..models.region import Town
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from shapely.geometry import Point, Polygon
 
 from .base_method import BaseMethod
 
@@ -72,7 +74,7 @@ class PopFrame(BaseMethod):
             for edge in mst.edges(data=True):
                 G.add_edge(edge[0], edge[1], level=level)
 
-    def build_network(self) -> nx.Graph:
+    def build_network_frame(self) -> nx.Graph:
         towns = self.region.get_towns_gdf().to_crs(4326)
         G = self._initialize_graph(towns)
 
@@ -236,3 +238,84 @@ class PopFrame(BaseMethod):
             # Convert geojson to GeoDataFrame
             gdf= gpd.GeoDataFrame.from_features(geojson)
             return gdf
+        
+
+    def create_square(self, center, size):
+        half_size = size / 2.0
+        return Polygon([
+            (center.x - half_size, center.y - half_size),
+            (center.x + half_size, center.y - half_size),
+            (center.x + half_size, center.y + half_size),
+            (center.x - half_size, center.y + half_size)
+        ])
+
+    def size_from_population(self, population, level):
+        if level in ["Малое сельское поселение", "Среднее сельское поселение", "Большое сельское поселение", "Крупное сельское поселение"]:
+            return 0.0005 * (population ** 0.5)   # Логарифмическая шкала для малых населенных пунктов
+        elif level == "Сверхкрупный город":
+            return 0.0001 * (population ** 0.5)  # Уменьшенная линейная шкала для сверхкрупных городов
+        return 0.0002 * (population ** 0.5)  # Линейная шкала для крупных населенных пунктов
+
+    def convert_points_to_squares(self, gdf):
+        new_geometries = []
+        for idx, row in gdf.iterrows():
+            if isinstance(row['geometry'], Point):
+                size = self.size_from_population(row['population'], row['level'])
+                square = self.create_square(row['geometry'], size)
+                new_geometries.append(square)
+            else:
+                new_geometries.append(row['geometry'])
+        gdf['geometry'] = new_geometries
+        return gdf
+
+    def get_color_map(self, levels):
+        base_colors = ['#FFC100', '#FF6500', '#C40C0C', '#6C0345']
+        cmap = mcolors.LinearSegmentedColormap.from_list("heatmap", base_colors, N=len(levels))
+        norm = mcolors.Normalize(vmin=0, vmax=len(levels) - 1)
+        colors = [mcolors.to_hex(cmap(norm(i))) for i in range(len(levels))]
+        return colors
+
+    def generate_map(self, towns):
+        gdf = self.convert_points_to_squares(towns)
+        levels = list(gdf['level'].unique())
+        levels.sort(key=lambda x: ["Малое сельское поселение", "Среднее сельское поселение", "Большое сельское поселение", "Крупное сельское поселение", "Малый город", "Средний город", "Большой город", "Крупный город", "Крупнейший город", "Сверхкрупный город"].index(x))
+        level_colors = dict(zip(levels, self.get_color_map(levels)))
+
+        m = folium.Map(zoom_start=10, tiles='CartoDB Positron')
+
+        for _, row in gdf.iterrows():
+            color = level_colors[row['level']]
+            popup_text = f"{row['name']}<br>Размер: {row['level']}<br>Население: {row['population']}"
+
+            folium.GeoJson(
+                row['geometry'],
+                style_function=lambda feature, color=color: {
+                    'fillColor': color,
+                    'color': color,
+                    'weight': 2,
+                    'fillOpacity': 0.6
+                },
+                tooltip=popup_text
+            ).add_to(m)
+
+        legend_html = '<div style="position: fixed; bottom: 50px; left: 50px; width: 300px; height: 350px; border:2px solid grey; z-index:9999; font-size:14px; background-color:white; padding: 10px;"><b>Легенда</b><br>'
+        for level, color in level_colors.items():
+            legend_html += f'&nbsp; {level} &nbsp; <i class="fa fa-square" style="font-size:20px;color:{color}"></i><br>'
+        legend_html += '</div>'
+
+        m.get_root().html.add_child(folium.Element(legend_html))
+
+        return m
+
+    def build_square_frame(self, output_type='html'):
+        towns = self.region.get_towns_gdf().to_crs(4326)
+        if output_type == 'html':
+            m = self.generate_map(towns)
+            m.save('final_square.html')
+            return 'HTML map saved as final_square.html'
+        elif output_type == 'gdf':
+            gdf = self.convert_points_to_squares(towns)
+            # gdf.to_file("gdf_square.geojson", driver="GeoJSON")
+            return gdf
+        else:
+            raise ValueError("Unsupported output type. Choose either 'html' or 'gdf'.")
