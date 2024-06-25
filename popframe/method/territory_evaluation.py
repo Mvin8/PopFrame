@@ -123,6 +123,9 @@ class TerritoryEvaluation(BaseMethod):
         }
 
         for territory in territories_gdf.itertuples():
+            # Получение имени территории или "nan", если имя отсутствует
+            territory_name = getattr(territory, "name", "None")
+            
             # Получение геометрии территории
             territory_geom = territory.geometry
 
@@ -162,7 +165,7 @@ class TerritoryEvaluation(BaseMethod):
 
             if highest_score > 0:
                 results.append({
-                    "territory": territory.name,
+                    "territory": territory_name,
                     "score": highest_score,
                     "interpretation": interpretation,
                     "closest_settlement": closest_settlement_name,
@@ -190,7 +193,7 @@ class TerritoryEvaluation(BaseMethod):
             # Возвращение результатов, если найдена подходящая пара
             if closest_settlement1 and closest_settlement2:
                 results.append({
-                    "territory": territory.name,
+                    "territory": territory_name,
                     "score": highest_score,
                     "interpretation": interpretation,
                     "closest_settlement": None,
@@ -199,7 +202,7 @@ class TerritoryEvaluation(BaseMethod):
                 })
             else:
                 results.append({
-                    "territory": territory.name,
+                    "territory": territory_name,
                     "score": 0,
                     "interpretation": "Территория находится за границей агломерации",
                     "closest_settlement": None,
