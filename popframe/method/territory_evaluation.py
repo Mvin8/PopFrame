@@ -355,82 +355,85 @@ class TerritoryEvaluation(BaseMethod):
     #     return results
     
     def population_criterion(self, merged_gdf, territories):
-        # Преобразование данных в систему координат 3857
-        assessment_score = 3
-        if territories is None:
-            gdf_territory = self.region.get_territories_gdf().to_crs(epsg=3857)
-        else:
-            territories = json.dumps(territories)
-            gdf_territory = gpd.read_file(StringIO(territories)).to_crs(epsg=3857)
-        gdf_municipalities = merged_gdf.to_crs(epsg=3857)
+            # Преобразование данных в систему координат 3857
+            assessment_score = 3
+            if territories is None:
+                gdf_territory = self.region.get_territories_gdf().to_crs(epsg=3857)
+            else:
+                territories = json.dumps(territories)
+                gdf_territory = gpd.read_file(StringIO(territories)).to_crs(epsg=3857)
+            gdf_municipalities = merged_gdf.to_crs(epsg=3857)
 
-        # Функция для вычисления средней плотности населения и среднего прироста населения в радиусе 60 км
-        def _calculate_density_growth(gdf_territory, gdf_municipalities, radius_m=60000):
-            results = []
+            # Функция для вычисления средней плотности населения и среднего прироста населения в радиусе 60 км
+            def _calculate_density_growth(gdf_territory, gdf_municipalities, radius_m=60000):
+                results = []
+                
+                for _, territory in gdf_territory.iterrows():
+                    buffer = territory.geometry.buffer(radius_m)
+                    municipalities_in_buffer = gdf_municipalities[gdf_municipalities.intersects(buffer)]
+
+                    municipalities_filtered = [m for _, m in municipalities_in_buffer.iterrows()
+                                            if m.geometry.intersection(buffer).area / m.geometry.area >= 0.15]
+
+                    if municipalities_filtered:
+                        densities = [m['density_2022'] for m in municipalities_filtered]
+                        growths = [m['growth_2022'] for m in municipalities_filtered]
+                        avg_density = np.mean(densities)
+                        avg_growth = np.mean(growths)
+                        territory_name = territory['name'] if 'name' in territory else None
+                        results.append({
+                            'project': territory_name,
+                            'average_population_density': round(avg_density, 1),
+                            'average_population_growth': round(avg_growth, 1)
+                        })
+                return results
+
+            results = _calculate_density_growth(gdf_territory, gdf_municipalities)
+
+            score_table = {
+                (5, 'Меньше 10 чел на кв. км.', 'Убыль'): 2,
+                (5, 'Меньше 10 чел на кв. км.', 'Рост'): 4,
+                (5, '10 – 50 чел на кв. км.', 'Убыль'): 3,
+                (5, '10 – 50 чел на кв. км.', 'Рост'): 5,
+                (5, 'Более 50 чел. на кв. км.', 'Убыль'): 4,
+                (5, 'Более 50 чел. на кв. км.', 'Рост'): 5,
+                (4, 'Меньше 10 чел на кв. км.', 'Убыль'): 2,
+                (4, 'Меньше 10 чел на кв. км.', 'Рост'): 4,
+                (4, '10 – 50 чел на кв. км.', 'Убыль'): 3,
+                (4, '10 – 50 чел на кв. км.', 'Рост'): 4,
+                (4, 'Более 50 чел. на кв. км.', 'Убыль'): 4,
+                (4, 'Более 50 чел. на кв. км.', 'Рост'): 5,
+                (3, 'Меньше 10 чел на кв. км.', 'Убыль'): 2,
+                (3, 'Меньше 10 чел на кв. км.', 'Рост'): 3,
+                (3, '10 – 50 чел на кв. км.', 'Убыль'): 2,
+                (3, '10 – 50 чел на кв. км.', 'Рост'): 3,
+                (3, 'Более 50 чел. на кв. км.', 'Убыль'): 3,
+                (3, 'Более 50 чел. на кв. км.', 'Рост'): 4,
+                (2, 'Меньше 10 чел на кв. км.', 'Убыль'): 1,
+                (2, 'Меньше 10 чел на кв. км.', 'Рост'): 2,
+                (2, '10 – 50 чел на кв. км.', 'Убыль'): 1,
+                (2, '10 – 50 чел на кв. км.', 'Рост'): 2,
+                (2, 'Более 50 чел. на кв. км.', 'Убыль'): 2,
+                (2, 'Более 50 чел. на кв. км.', 'Рост'): 3,
+            }
+
+            def _assess_territory(density, growth, assessment_score):
+                growth_status = 'Убыль' if growth < 0 else 'Рост'
+                if density < 10:
+                    density_status = 'Меньше 10 чел на кв. км.'
+                elif 10 <= density <= 50:
+                    density_status = '10 – 50 чел на кв. км.'
+                else:
+                    density_status = 'Более 50 чел. на кв. км.'
+
+                return score_table.get((assessment_score, density_status, growth_status), 0)
             
-            for _, territory in gdf_territory.iterrows():
-                buffer = territory.geometry.buffer(radius_m)
-                municipalities_in_buffer = gdf_municipalities[gdf_municipalities.intersects(buffer)]
+            for result in results:
+                result['score'] = _assess_territory(result['average_population_density'], result['average_population_growth'], assessment_score)
 
-                municipalities_filtered = [m for _, m in municipalities_in_buffer.iterrows()
-                                        if m.geometry.intersection(buffer).area / m.geometry.area >= 0.15]
-
-                if municipalities_filtered:
-                    densities = [m['density_2022'] for m in municipalities_filtered]
-                    growths = [m['growth_2022'] for m in municipalities_filtered]
-                    avg_density = np.mean(densities)
-                    avg_growth = np.mean(growths)
-                    results.append({
-                        'project': territory['name'],
-                        'average_population_density': round(avg_density, 1),
-                        'average_population_growth': round(avg_growth, 1)
-                    })
             return results
 
-        results = _calculate_density_growth(gdf_territory, gdf_municipalities)
 
-        score_table = {
-            (5, 'Меньше 10 чел на кв. км.', 'Убыль'): 2,
-            (5, 'Меньше 10 чел на кв. км.', 'Рост'): 4,
-            (5, '10 – 50 чел на кв. км.', 'Убыль'): 3,
-            (5, '10 – 50 чел на кв. км.', 'Рост'): 5,
-            (5, 'Более 50 чел. на кв. км.', 'Убыль'): 4,
-            (5, 'Более 50 чел. на кв. км.', 'Рост'): 5,
-            (4, 'Меньше 10 чел на кв. км.', 'Убыль'): 2,
-            (4, 'Меньше 10 чел на кв. км.', 'Рост'): 4,
-            (4, '10 – 50 чел на кв. км.', 'Убыль'): 3,
-            (4, '10 – 50 чел на кв. км.', 'Рост'): 4,
-            (4, 'Более 50 чел. на кв. км.', 'Убыль'): 4,
-            (4, 'Более 50 чел. на кв. км.', 'Рост'): 5,
-            (3, 'Меньше 10 чел на кв. км.', 'Убыль'): 2,
-            (3, 'Меньше 10 чел на кв. км.', 'Рост'): 3,
-            (3, '10 – 50 чел на кв. км.', 'Убыль'): 2,
-            (3, '10 – 50 чел на кв. км.', 'Рост'): 3,
-            (3, 'Более 50 чел. на кв. км.', 'Убыль'): 3,
-            (3, 'Более 50 чел. на кв. км.', 'Рост'): 4,
-            (2, 'Меньше 10 чел на кв. км.', 'Убыль'): 1,
-            (2, 'Меньше 10 чел на кв. км.', 'Рост'): 2,
-            (2, '10 – 50 чел на кв. км.', 'Убыль'): 1,
-            (2, '10 – 50 чел на кв. км.', 'Рост'): 2,
-            (2, 'Более 50 чел. на кв. км.', 'Убыль'): 2,
-            (2, 'Более 50 чел. на кв. км.', 'Рост'): 3,
-        }
-
-        def _assess_territory(density, growth, assessment_score):
-            growth_status = 'Убыль' if growth < 0 else 'Рост'
-            if density < 10:
-                density_status = 'Меньше 10 чел на кв. км.'
-            elif 10 <= density <= 50:
-                density_status = '10 – 50 чел на кв. км.'
-            else:
-                density_status = 'Более 50 чел. на кв. км.'
-
-            return score_table.get((assessment_score, density_status, growth_status), 0)
-        
-        for result in results:
-            result['score'] = _assess_territory(result['average_population_density'], result['average_population_growth'], assessment_score)
-
-        return results
 
         
 
