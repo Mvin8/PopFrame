@@ -101,14 +101,79 @@ class UrbanisationLevel(BaseMethod):
 
         landuse_gdf = gpd.GeoDataFrame(all_combined_geometries, columns=['indicator', 'geometry'], crs='EPSG:4326')
 
+        # Separate handling for '1.3.1 Процент застройки жилищным строительством'
+        residential_gdf = landuse_gdf[landuse_gdf['indicator'].isin(['1.3.1 Процент застройки жилищным строительством'])]
+        other_gdf = landuse_gdf[~landuse_gdf['indicator'].isin(['1.3.1 Процент застройки жилищным строительством'])]
+
+        if not residential_gdf.empty:
+            other_union = unary_union(other_gdf.geometry)
+            adjusted_geometries = []
+            for geom in residential_gdf.geometry:
+                adjusted_geom = geom.difference(other_union)
+                if not adjusted_geom.is_empty:
+                    adjusted_geometries.append(adjusted_geom)
+            residential_gdf['geometry'] = adjusted_geometries
+            landuse_gdf = pd.concat([other_gdf, residential_gdf], ignore_index=True)
+
+        # Separate handling for '1.3.6 Процент земель населенных пунктов'
+        city_town_gdf = landuse_gdf[landuse_gdf['indicator'].isin(['1.3.6 Процент земель населенных пунктов'])]
+        other_gdf = landuse_gdf[~landuse_gdf['indicator'].isin(['1.3.6 Процент земель населенных пунктов'])]
+
+        if not city_town_gdf.empty:
+            other_union = unary_union(other_gdf.geometry)
+            adjusted_geometries = []
+            for geom in city_town_gdf.geometry:
+                adjusted_geom = geom.difference(other_union)
+                if not adjusted_geom.is_empty:
+                    adjusted_geometries.append(adjusted_geom)
+            city_town_gdf['geometry'] = adjusted_geometries
+            landuse_gdf = pd.concat([other_gdf, city_town_gdf], ignore_index=True)
+
+        # Separate handling for '1.3.5 Процент земель специального назначения'
+        special_gdf = landuse_gdf[landuse_gdf['indicator'].isin(['1.3.5 Процент земель специального назначения'])]
+        other_gdf = landuse_gdf[~landuse_gdf['indicator'].isin(['1.3.5 Процент земель специального назначения'])]
+
+        if not special_gdf.empty:
+            other_union = unary_union(other_gdf.geometry)
+            adjusted_geometries = []
+            for geom in special_gdf.geometry:
+                adjusted_geom = geom.difference(other_union)
+                if not adjusted_geom.is_empty:
+                    adjusted_geometries.append(adjusted_geom)
+            special_gdf['geometry'] = adjusted_geometries
+            landuse_gdf = pd.concat([other_gdf, special_gdf], ignore_index=True)
+
         # Calculate the area percentage
         region_area_km2 = territories_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area.sum() / 1e6
         landuse_gdf['urbanization'] = (landuse_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area / 1e6 / region_area_km2 * 100).round().astype(int)
 
-        # Reorder columns
-        landuse_gdf = landuse_gdf[['indicator', 'urbanization', 'geometry']]
+        # Calculate the '1.3.9 Другие земли' indicator
+        all_landuse_union = unary_union(landuse_gdf.geometry)
+        total_polygon = unary_union(territories_gdf.geometry)
+        other_landuse = total_polygon.difference(all_landuse_union)
 
-        return landuse_gdf
+        if not other_landuse.is_empty:
+            other_landuse_gdf = gpd.GeoDataFrame([{'indicator': '1.3.9 Другие земли', 'geometry': other_landuse}], crs='EPSG:4326')
+            other_landuse_gdf['urbanization'] = (other_landuse_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area / 1e6 / region_area_km2 * 100).round().astype(int)
+            landuse_gdf = pd.concat([landuse_gdf, other_landuse_gdf], ignore_index=True)
+
+        # Create results DataFrame
+        results = []
+        for index, row in landuse_gdf.iterrows():
+            key = row['indicator']
+            value = row['urbanization']
+            results.append({
+                '№ п/п': key.split(' ')[0],
+                'Название хранимое': ' '.join(key.split(' ')[1:]) if ' ' in key else key,
+                'ед.изм.': '%',
+                'Значение': value,
+                'Источник': 'modeled',
+                'Период': 2024,
+                'geometry': row['geometry']
+            })
+        results_gdf = gpd.GeoDataFrame(results, crs='EPSG:4326')
+
+        return results_gdf
 
     def plot_landuse(self, region_gdf, landuse_gdf):
         if region_gdf.crs is None:
@@ -129,22 +194,24 @@ class UrbanisationLevel(BaseMethod):
             'Земли специального назначения': 'brown',
             'Земли населенных пунктов': 'orange',
             'Особо охраняемые природные территории': 'purple',
-            'Водный фонд': 'cyan'
+            'Водный фонд': 'cyan',
+            'Другие земли': 'white'
         }
         
         landuse_mapping = {
-            '1.3.1 Процент застройки жилищным строительством': 'Застройка жилищным строительством',
-            '1.3.2 Процент земель сельскохозяйственного назначения': 'Сельскохозяйственные земли',
-            '1.3.3 Процент земель промышленного назначения': 'Промышленные земли',
-            '1.3.4 Процент земель, занимаемыми лесными массивами': 'Лесные массивы',
-            '1.3.5 Процент земель специального назначения': 'Земли специального назначения',
-            '1.3.6 Процент земель населенных пунктов': 'Земли населенных пунктов',
-            '1.3.7 Процент земель, занимаемых особо охраняемыми природными территориями': 'Особо охраняемые природные территории',
-            '1.3.8 Процент земель, занимаемых водным фондом': 'Водный фонд'
+            'Процент застройки жилищным строительством': 'Застройка жилищным строительством',
+            'Процент земель сельскохозяйственного назначения': 'Сельскохозяйственные земли',
+            'Процент земель промышленного назначения': 'Промышленные земли',
+            'Процент земель, занимаемыми лесными массивами': 'Лесные массивы',
+            'Процент земель специального назначения': 'Земли специального назначения',
+            'Процент земель населенных пунктов': 'Земли населенных пунктов',
+            'Процент земель, занимаемых особо охраняемыми природными территориями': 'Особо охраняемые природные территории',
+            'Процент земель, занимаемых водным фондом': 'Водный фонд',
+            'Другие земли': 'Другие земли'
         }
         
         for key, label in landuse_mapping.items():
-            gdf = landuse_gdf[landuse_gdf['indicator'] == key]
+            gdf = landuse_gdf[landuse_gdf['Название хранимое'] == key]
             if not gdf.empty:
                 if gdf.crs is None:
                     gdf.set_crs(epsg=4326, inplace=True)
