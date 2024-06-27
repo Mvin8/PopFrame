@@ -36,7 +36,7 @@ class UrbanisationLevel(BaseMethod):
 
         landuse_tags = {
             '1.3.1 Процент застройки жилищным строительством': ['residential', 'apartments', 'detached', 'construction'],
-            '1.3.2 Процент земель сельскохозяйственного назначения': ['farmland', 'farmyard', 'orchard', 'vineyard', 'greenhouse_horticulture', 'meadow', 'plant_nursery', 'aquaculture', 'animal_keeping', 'breeding'],
+            '1.3.2 Процент земель сельскохозяйственного назначения': ['farmland', 'farmyard', 'orchard', 'vineyard', 'greenhouse_horticulture', 'meadow', 'plant_nursery', 'aquaculture', 'animal_keeping', 'breeding', 'grassland'],
             '1.3.3 Процент земель промышленного назначения': ['industrial', 'quarry', 'landfill'],
             '1.3.4 Процент земель, занимаемыми лесными массивами': ['forest', 'wood'],
             '1.3.5 Процент земель специального назначения': ['military', 'railway', 'cemetery', 'landfill', 'brownfield'],
@@ -48,7 +48,7 @@ class UrbanisationLevel(BaseMethod):
         unique_tags = set(tag for tags in landuse_tags.values() for tag in tags)
         tag_filters = [{'landuse': tag} for tag in unique_tags if not tag.startswith('place_')] + \
                       [{'place': 'city'}, {'place': 'town'}] + \
-                      [{'natural': 'water'}, {'natural': 'wood'}]
+                      [{'natural': 'water'}, {'natural': 'wood'}, {'natural': 'grassland'}]
 
         def process_polygon(polygon):
             unique_gdfs = {}
@@ -73,7 +73,7 @@ class UrbanisationLevel(BaseMethod):
                     if tag.startswith('place_'):
                         tag_filter = {'place': 'city' if tag == 'place_city' else 'town'}
                     else:
-                        tag_filter = {'landuse': tag} if tag not in ['wood', 'water'] else {'natural': tag}
+                        tag_filter = {'landuse': tag} if tag not in ['wood', 'water', 'grassland'] else {'natural': tag}
 
                     gdf = unique_gdfs.get(frozenset(tag_filter.items()))
                     if gdf is not None:
@@ -145,7 +145,7 @@ class UrbanisationLevel(BaseMethod):
 
         # Calculate the area percentage
         region_area_km2 = territories_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area.sum() / 1e6
-        landuse_gdf['urbanization'] = (landuse_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area / 1e6 / region_area_km2 * 100).round().astype(int)
+        landuse_gdf['urbanization'] = (landuse_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area / 1e6 / region_area_km2 * 100)
 
         # Calculate the '1.3.9 Другие земли' indicator
         all_landuse_union = unary_union(landuse_gdf.geometry)
@@ -153,8 +153,8 @@ class UrbanisationLevel(BaseMethod):
         other_landuse = total_polygon.difference(all_landuse_union)
 
         if not other_landuse.is_empty:
-            other_landuse_gdf = gpd.GeoDataFrame([{'indicator': '1.3.9 Другие земли', 'geometry': other_landuse}], crs='EPSG:4326')
-            other_landuse_gdf['urbanization'] = (other_landuse_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area / 1e6 / region_area_km2 * 100).round().astype(int)
+            other_landuse_gdf = gpd.GeoDataFrame([{'indicator': '1.3.9 Территории смежного назначения', 'geometry': other_landuse}], crs='EPSG:4326')
+            other_landuse_gdf['urbanization'] = (other_landuse_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area / 1e6 / region_area_km2 * 100)
             landuse_gdf = pd.concat([landuse_gdf, other_landuse_gdf], ignore_index=True)
 
         # Create results DataFrame
@@ -166,7 +166,7 @@ class UrbanisationLevel(BaseMethod):
                 '№ п/п': key.split(' ')[0],
                 'Название хранимое': ' '.join(key.split(' ')[1:]) if ' ' in key else key,
                 'ед.изм.': '%',
-                'Значение': value,
+                'Значение': int(round(value)),
                 'Источник': 'modeled',
                 'Период': 2024,
                 'geometry': row['geometry']
@@ -207,7 +207,7 @@ class UrbanisationLevel(BaseMethod):
             'Процент земель населенных пунктов': 'Земли населенных пунктов',
             'Процент земель, занимаемых особо охраняемыми природными территориями': 'Особо охраняемые природные территории',
             'Процент земель, занимаемых водным фондом': 'Водный фонд',
-            'Другие земли': 'Другие земли'
+            'Другие земли': 'Территории смежного назначения'
         }
         
         for key, label in landuse_mapping.items():
