@@ -240,29 +240,23 @@ class PopFrame(BaseMethod):
             return gdf
         
 
-    def create_square(self, center, size):
-        half_size = size / 2.0
-        return Polygon([
-            (center.x - half_size, center.y - half_size),
-            (center.x + half_size, center.y - half_size),
-            (center.x + half_size, center.y + half_size),
-            (center.x - half_size, center.y + half_size)
-        ])
+    def create_circle(self, center, size):
+        return center.buffer(size)
 
     def size_from_population(self, population, level):
-        if level in ["Малое сельское поселение", "Среднее сельское поселение", "Большое сельское поселение", "Крупное сельское поселение"]:
-            return 0.0005 * (population ** 0.5)   # Логарифмическая шкала для малых населенных пунктов
+        if level in ["Малое сельское поселение", "Среднее сельское поселение", "Большое сельское поселение"]:
+            return 0.0002 * (population ** 0.5)   # Логарифмическая шкала для малых населенных пунктов
         elif level == "Сверхкрупный город":
             return 0.0001 * (population ** 0.5)  # Уменьшенная линейная шкала для сверхкрупных городов
-        return 0.0002 * (population ** 0.5)  # Линейная шкала для крупных населенных пунктов
+        return 0.0001 * (population ** 0.5)  # Линейная шкала для крупных населенных пунктов
 
-    def convert_points_to_squares(self, gdf):
+    def convert_points_to_circles(self, gdf):
         new_geometries = []
         for idx, row in gdf.iterrows():
             if isinstance(row['geometry'], Point):
                 size = self.size_from_population(row['population'], row['level'])
-                square = self.create_square(row['geometry'], size)
-                new_geometries.append(square)
+                circle = self.create_circle(row['geometry'], size)
+                new_geometries.append(circle)
             else:
                 new_geometries.append(row['geometry'])
         gdf['geometry'] = new_geometries
@@ -276,7 +270,7 @@ class PopFrame(BaseMethod):
         return colors
 
     def generate_map(self, towns):
-        gdf = self.convert_points_to_squares(towns)
+        gdf = self.convert_points_to_circles(towns)
         levels = list(gdf['level'].unique())
         levels.sort(key=lambda x: ["Малое сельское поселение", "Среднее сельское поселение", "Большое сельское поселение", "Крупное сельское поселение", "Малый город", "Средний город", "Большой город", "Крупный город", "Крупнейший город", "Сверхкрупный город"].index(x))
         level_colors = dict(zip(levels, self.get_color_map(levels)))
@@ -300,22 +294,22 @@ class PopFrame(BaseMethod):
 
         legend_html = '<div style="position: fixed; bottom: 50px; left: 50px; width: 300px; height: 350px; border:2px solid grey; z-index:9999; font-size:14px; background-color:white; padding: 10px;"><b>Легенда</b><br>'
         for level, color in level_colors.items():
-            legend_html += f'&nbsp; {level} &nbsp; <i class="fa fa-square" style="font-size:20px;color:{color}"></i><br>'
+            legend_html += f'&nbsp; {level} &nbsp; <i class="fa fa-circle" style="font-size:20px;color:{color}"></i><br>'
         legend_html += '</div>'
 
         m.get_root().html.add_child(folium.Element(legend_html))
 
         return m
 
-    def build_square_frame(self, output_type='html'):
+    def build_circle_frame(self, output_type='html'):
         towns = self.region.get_towns_gdf().to_crs(4326)
         if output_type == 'html':
             m = self.generate_map(towns)
-            m.save('final_square.html')
-            return 'HTML map saved as final_square.html'
+            m.save('final_circle.html')
+            return 'HTML map saved as final_circle.html'
         elif output_type == 'gdf':
-            gdf = self.convert_points_to_squares(towns)
-            # gdf.to_file("gdf_square.geojson", driver="GeoJSON")
+            gdf = self.convert_points_to_circles(towns)
+            gdf.to_file("gdf_circle.geojson", driver="GeoJSON")
             return gdf
         else:
             raise ValueError("Unsupported output type. Choose either 'html' or 'gdf'.")
