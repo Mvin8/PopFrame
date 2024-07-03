@@ -196,11 +196,9 @@ class PopFrame(BaseMethod):
             "type": "FeatureCollection",
             "features": []
         }
-
-        # Добавление узлов графа как точек с сохранением всех атрибутов
         for node, attrs in G.nodes(data=True):
             name = towns.loc[node, 'name']
-            population = towns.loc[node, 'population']
+            population = int(towns.loc[node, 'population']) 
             
             point_feature = {
                 "type": "Feature",
@@ -210,13 +208,12 @@ class PopFrame(BaseMethod):
                 },
                 "properties": {
                     "name": name,
-                    "level": attrs['level'],
+                    "level": attrs['level'], 
                     "population": population
                 }
             }
             geojson["features"].append(point_feature)
 
-        # Добавление рёбер графа как линий
         for edge in G.edges(data=True):
             source_pos = G.nodes[edge[0]]['pos']
             target_pos = G.nodes[edge[1]]['pos']
@@ -226,7 +223,7 @@ class PopFrame(BaseMethod):
                     "type": "LineString",
                     "coordinates": [[source_pos[0], source_pos[1]], [target_pos[0], target_pos[1]]]
                 },
-                "properties": edge[2]
+                "properties": {k: (int(v) if isinstance(v, np.int64) else v) for k, v in edge[2].items()}  # Преобразуем все int64 в int
             }
             geojson["features"].append(line_feature)
 
@@ -236,7 +233,7 @@ class PopFrame(BaseMethod):
             print(f"Graph successfully saved to {filepath} with all node attributes.")
         else:
             # Convert geojson to GeoDataFrame
-            gdf= gpd.GeoDataFrame.from_features(geojson)
+            gdf = gpd.GeoDataFrame.from_features(geojson)
             return gdf
         
 
@@ -247,7 +244,7 @@ class PopFrame(BaseMethod):
         if level in ["Малое сельское поселение", "Среднее сельское поселение", "Большое сельское поселение"]:
             return 0.0002 * (population ** 0.5)   # Логарифмическая шкала для малых населенных пунктов
         elif level == "Сверхкрупный город":
-            return 0.0001 * (population ** 0.5)  # Уменьшенная линейная шкала для сверхкрупных городов
+            return 0.00006 * (population ** 0.5)  # Уменьшенная линейная шкала для сверхкрупных городов
         return 0.0001 * (population ** 0.5)  # Линейная шкала для крупных населенных пунктов
 
     def convert_points_to_circles(self, gdf):

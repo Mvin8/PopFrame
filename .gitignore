@@ -136,6 +136,7 @@ dmypy.json
 *.parquet
 *.geojson
 *.pkl
+*.sld
 *.html
 *.graphml
 *.csv
