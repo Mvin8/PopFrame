@@ -13,6 +13,7 @@ import contextily as ctx
 from matplotlib.lines import Line2D
 from ..models.region_old import Town
 from .base_method import BaseMethod
+import math
 
 
 class UrbanisationLevel(BaseMethod):
@@ -20,6 +21,7 @@ class UrbanisationLevel(BaseMethod):
     @retry(stop_max_attempt_number=5, wait_fixed=2000)
     def fetch_osm_data(self, polygon, tags):
         return ox.features_from_polygon(polygon, tags=tags)
+
 
     def get_landuse_data(self, territories):
         if isinstance(territories, gpd.GeoDataFrame):
@@ -101,47 +103,20 @@ class UrbanisationLevel(BaseMethod):
 
         landuse_gdf = gpd.GeoDataFrame(all_combined_geometries, columns=['indicator', 'geometry'], crs='EPSG:4326')
 
-        # Separate handling for '1.3.1 Процент застройки жилищным строительством'
-        residential_gdf = landuse_gdf[landuse_gdf['indicator'].isin(['1.3.1 Процент застройки жилищным строительством'])]
-        other_gdf = landuse_gdf[~landuse_gdf['indicator'].isin(['1.3.1 Процент застройки жилищным строительством'])]
+        def adjust_geometries(main_indicator, other_gdf, landuse_gdf):
+            main_gdf = landuse_gdf[landuse_gdf['indicator'] == main_indicator]
+            if not main_gdf.empty:
+                other_union = unary_union(other_gdf.geometry)
+                adjusted_geometries = [geom.difference(other_union) for geom in main_gdf.geometry if not geom.difference(other_union).is_empty]
+                if adjusted_geometries:
+                    main_gdf['geometry'] = adjusted_geometries
+                    return pd.concat([other_gdf, main_gdf], ignore_index=True)
+            return landuse_gdf
 
-        if not residential_gdf.empty:
-            other_union = unary_union(other_gdf.geometry)
-            adjusted_geometries = []
-            for geom in residential_gdf.geometry:
-                adjusted_geom = geom.difference(other_union)
-                if not adjusted_geom.is_empty:
-                    adjusted_geometries.append(adjusted_geom)
-            residential_gdf['geometry'] = adjusted_geometries
-            landuse_gdf = pd.concat([other_gdf, residential_gdf], ignore_index=True)
+        landuse_gdf = adjust_geometries('1.3.5 Процент земель специального назначения', landuse_gdf[~landuse_gdf['indicator'].isin(['1.3.5 Процент земель специального назначения'])], landuse_gdf)
+        landuse_gdf = adjust_geometries('1.3.1 Процент застройки жилищным строительством', landuse_gdf[~landuse_gdf['indicator'].isin(['1.3.1 Процент застройки жилищным строительством'])], landuse_gdf)
+        landuse_gdf = adjust_geometries('1.3.6 Процент земель населенных пунктов', landuse_gdf[~landuse_gdf['indicator'].isin(['1.3.6 Процент земель населенных пунктов'])], landuse_gdf)
 
-        # Separate handling for '1.3.6 Процент земель населенных пунктов'
-        city_town_gdf = landuse_gdf[landuse_gdf['indicator'].isin(['1.3.6 Процент земель населенных пунктов'])]
-        other_gdf = landuse_gdf[~landuse_gdf['indicator'].isin(['1.3.6 Процент земель населенных пунктов'])]
-
-        if not city_town_gdf.empty:
-            other_union = unary_union(other_gdf.geometry)
-            adjusted_geometries = []
-            for geom in city_town_gdf.geometry:
-                adjusted_geom = geom.difference(other_union)
-                if not adjusted_geom.is_empty:
-                    adjusted_geometries.append(adjusted_geom)
-            city_town_gdf['geometry'] = adjusted_geometries
-            landuse_gdf = pd.concat([other_gdf, city_town_gdf], ignore_index=True)
-
-        # Separate handling for '1.3.5 Процент земель специального назначения'
-        special_gdf = landuse_gdf[landuse_gdf['indicator'].isin(['1.3.5 Процент земель специального назначения'])]
-        other_gdf = landuse_gdf[~landuse_gdf['indicator'].isin(['1.3.5 Процент земель специального назначения'])]
-
-        if not special_gdf.empty:
-            other_union = unary_union(other_gdf.geometry)
-            adjusted_geometries = []
-            for geom in special_gdf.geometry:
-                adjusted_geom = geom.difference(other_union)
-                if not adjusted_geom.is_empty:
-                    adjusted_geometries.append(adjusted_geom)
-            special_gdf['geometry'] = adjusted_geometries
-            landuse_gdf = pd.concat([other_gdf, special_gdf], ignore_index=True)
 
         # Calculate the area percentage
         region_area_km2 = territories_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area.sum() / 1e6
@@ -157,16 +132,36 @@ class UrbanisationLevel(BaseMethod):
             other_landuse_gdf['urbanization'] = (other_landuse_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area / 1e6 / region_area_km2 * 100)
             landuse_gdf = pd.concat([landuse_gdf, other_landuse_gdf], ignore_index=True)
 
+        # Group by 'indicator' and union geometries to avoid duplicates
+        grouped_landuse_gdf = landuse_gdf.groupby('indicator').agg({
+            'geometry': lambda x: unary_union(x),
+            'urbanization': 'sum'
+        }).reset_index()
+
         # Create results DataFrame
         results = []
-        for index, row in landuse_gdf.iterrows():
+        total_value = 0
+
+        # Сначала собираем все значения
+        for index, row in grouped_landuse_gdf.iterrows():
+            total_value += row['urbanization']
+
+        # Проверяем, если сумма больше 100
+        if total_value > 100:
+            normalization_factor = 100 / total_value
+        else:
+            normalization_factor = 1
+
+        # Заполняем результаты с учетом нормализации
+        for index, row in grouped_landuse_gdf.iterrows():
             key = row['indicator']
-            value = row['urbanization']
+            value = row['urbanization'] * normalization_factor
+            rounded_value = math.floor(value * 1000) / 1000.0  # Округляем в меньшую сторону до трех знаков после запятой
             results.append({
                 '№ п/п': key.split(' ')[0],
                 'Название хранимое': ' '.join(key.split(' ')[1:]) if ' ' in key else key,
                 'ед.изм.': '%',
-                'Значение': int(round(value)),
+                'Значение': rounded_value,
                 'Источник': 'modeled',
                 'Период': 2024,
                 'geometry': row['geometry']
