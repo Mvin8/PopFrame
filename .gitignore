@@ -103,6 +103,7 @@ celerybeat.pid
 .env
 .venv
 env/
+csv
 venv/
 ENV/
 env.bak/
