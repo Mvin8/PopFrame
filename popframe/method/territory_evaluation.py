@@ -355,11 +355,11 @@ class TerritoryEvaluation(BaseMethod):
     def population_criterion(self, merged_gdf, territories):
             # Преобразование данных в систему координат 3857
             assessment_score = 3
+
+            gdf_territory = territories.to_crs(epsg=3857)
             if territories is None:
                 gdf_territory = self.region.get_territories_gdf().to_crs(epsg=3857)
-            else:
-                territories = json.dumps(territories)
-                gdf_territory = gpd.read_file(StringIO(territories)).to_crs(epsg=3857)
+
             gdf_municipalities = merged_gdf.to_crs(epsg=3857)
 
             # Функция для вычисления средней плотности населения и среднего прироста населения в радиусе 60 км
