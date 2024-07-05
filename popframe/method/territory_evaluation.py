@@ -96,11 +96,9 @@ class TerritoryEvaluation(BaseMethod):
 
     def evaluate_territory_location(self, territories):
         settlements_gdf = self.region.get_towns_gdf()
+        territories_gdf = territories
         if territories is None:
             territories_gdf = self.region.get_territories_gdf()
-        else:
-            territories = json.dumps(territories)
-            territories_gdf = gpd.read_file(StringIO(territories))
 
         # Преобразование системы координат
         settlements_gdf = settlements_gdf.to_crs(epsg=3857)

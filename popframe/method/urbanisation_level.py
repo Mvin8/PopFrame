@@ -24,17 +24,9 @@ class UrbanisationLevel(BaseMethod):
 
 
     def get_landuse_data(self, territories):
-        if isinstance(territories, gpd.GeoDataFrame):
-            territories_gdf = territories.to_crs(4326)
-        elif isinstance(territories, (str, dict)):
-            if isinstance(territories, dict):
-                territories = json.dumps(territories)
-            territories_gdf = gpd.read_file(StringIO(territories))
-            territories_gdf.set_crs(epsg=4326, inplace=True)
-        elif territories is None:
+        territories_gdf = territories
+        if territories is None:
             territories_gdf = self.region.get_territories_gdf()
-        else:
-            raise ValueError("Invalid type for territories. Expected GeoDataFrame, JSON string, dictionary, or None.")
 
         landuse_tags = {
             '1.3.1 Процент застройки жилищным строительством': ['residential', 'apartments', 'detached', 'construction'],
