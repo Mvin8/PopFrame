@@ -18,7 +18,12 @@ class PopFrame(BaseMethod):
         """Initializes the graph with nodes"""
         G = nx.Graph()
         for idx, row in towns.iterrows():
-            G.add_node(idx, pos=(row.geometry.x, row.geometry.y), level=row['level'])
+            G.add_node(
+                idx, 
+                pos=(row.geometry.x, row.geometry.y), 
+                level=row['level'], 
+                name=row['name']
+            )
         return G
 
     def _connect_levels(self, towns: gpd.GeoDataFrame, G: nx.Graph, from_level: str, to_levels: List[str]):
@@ -259,7 +264,7 @@ class PopFrame(BaseMethod):
         gdf['geometry'] = new_geometries
         return gdf
 
-    def get_color_map(self, levels):
+    def _get_color_map(self, levels):
         base_colors = ['#FFC100', '#FF6500', '#C40C0C', '#6C0345']
         cmap = mcolors.LinearSegmentedColormap.from_list("heatmap", base_colors, N=len(levels))
         norm = mcolors.Normalize(vmin=0, vmax=len(levels) - 1)
@@ -270,7 +275,7 @@ class PopFrame(BaseMethod):
         gdf = self.convert_points_to_circles(towns)
         levels = list(gdf['level'].unique())
         levels.sort(key=lambda x: ["Малое сельское поселение", "Среднее сельское поселение", "Большое сельское поселение", "Крупное сельское поселение", "Малый город", "Средний город", "Большой город", "Крупный город", "Крупнейший город", "Сверхкрупный город"].index(x))
-        level_colors = dict(zip(levels, self.get_color_map(levels)))
+        level_colors = dict(zip(levels, self._get_color_map(levels)))
 
         m = folium.Map(zoom_start=10, tiles='CartoDB Positron')
 
