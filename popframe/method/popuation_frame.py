@@ -257,7 +257,8 @@ class PopFrame(BaseMethod):
         for idx, row in gdf.iterrows():
             if isinstance(row['geometry'], Point):
                 size = self.size_from_population(row['population'], row['level'])
-                circle = self.create_circle(row['geometry'], size)
+                size_in_meters = size * 111320  # Преобразование градусов в метры (примерный коэффициент)
+                circle = self.create_circle(row['geometry'], size_in_meters)
                 new_geometries.append(circle)
             else:
                 new_geometries.append(row['geometry'])
@@ -304,7 +305,7 @@ class PopFrame(BaseMethod):
         return m
 
     def build_circle_frame(self, output_type='html'):
-        towns = self.region.get_towns_gdf().to_crs(4326)
+        towns = self.region.get_towns_gdf().to_crs(3857)
         if output_type == 'html':
             m = self.generate_map(towns)
             m.save('final_circle.html')
