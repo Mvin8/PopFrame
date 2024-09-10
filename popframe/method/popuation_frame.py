@@ -274,6 +274,7 @@ class PopFrame(BaseMethod):
 
     def generate_map(self, towns):
         gdf = self.convert_points_to_circles(towns)
+        gdf = gdf.to_crs(4326)
         levels = list(gdf['level'].unique())
         levels.sort(key=lambda x: ["Малое сельское поселение", "Среднее сельское поселение", "Большое сельское поселение", "Крупное сельское поселение", "Малый город", "Средний город", "Большой город", "Крупный город", "Крупнейший город", "Сверхкрупный город"].index(x))
         level_colors = dict(zip(levels, self._get_color_map(levels)))

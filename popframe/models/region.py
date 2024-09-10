@@ -24,6 +24,7 @@ class Region():
     
     def __init__(
             self, 
+            region : gpd.GeoDataFrame, 
             districts : gpd.GeoDataFrame, 
             settlements : gpd.GeoDataFrame, 
             towns : gpd.GeoDataFrame, 
@@ -31,15 +32,17 @@ class Region():
             territories : gpd.GeoDataFrame | None = None
         ):
         
+        region = self.validate_region(region)
         districts = self.validate_districts(districts)
         settlements = self.validate_settlements(settlements)
         towns = self.validate_towns(towns)
         accessibility_matrix = self.validate_accessibility_matrix(accessibility_matrix)
 
         assert (accessibility_matrix.index == towns.index).all(), "Accessibility matrix indices and towns indices don't match"
-        assert districts.crs == settlements.crs == towns.crs, 'CRS should match everywhere'
+        assert region.crs == districts.crs == settlements.crs == towns.crs, 'CRS should match everywhere'
 
         self.crs = towns.crs
+        self.region = region
         self.districts = districts
         self.settlements = settlements
         self._towns = Town.from_gdf(towns)
@@ -69,6 +72,13 @@ class Region():
     def validate_towns(gdf : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         assert isinstance(gdf, gpd.GeoDataFrame), 'Towns should be instance of gpd.GeoDataFrame'
         return gdf
+
+    @staticmethod
+    def validate_region(gdf : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        assert isinstance(gdf, gpd.GeoDataFrame), 'Region should be instance of gpd.GeoDataFrame'
+        assert gdf.geom_type.isin(['Polygon', 'MultiPolygon']).all(), 'District geometry should be Polygon or MultiPolygon'
+        assert pd.api.types.is_string_dtype(gdf['name']), 'District name should be str'
+        return gdf[['geometry', 'name']]
     
     @staticmethod
     def validate_accessibility_matrix(df : pd.DataFrame) -> pd.DataFrame:
@@ -133,19 +143,19 @@ class Region():
     def geometry(self) -> shapely.Polygon | shapely.MultiPolygon:
         return self.districts.to_crs(4326).unary_union
     
-    def match_services_towns(self, gdf : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-        assert gdf.crs == self.crs, 'Services GeoDataFrame CRS should match region CRS'
-        gdf = gdf.copy()
-        towns_gdf = self.get_towns_gdf()[['geometry', 'population']]
+    # def match_services_towns(self, gdf : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    #     assert gdf.crs == self.crs, 'Services GeoDataFrame CRS should match region CRS'
+    #     gdf = gdf.copy()
+    #     towns_gdf = self.get_towns_gdf()[['geometry', 'population']]
         
-        def get_closest_city(service_i):
-            service_gdf = gdf[gdf.index == service_i]
-            sjoin = towns_gdf.sjoin_nearest(service_gdf, distance_col='distance')
-            sjoin['weight'] = sjoin['population'] / sjoin['distance'] / sjoin['distance']
-            return sjoin['weight'].idxmax()
+    #     def get_closest_city(service_i):
+    #         service_gdf = gdf[gdf.index == service_i]
+    #         sjoin = towns_gdf.sjoin_nearest(service_gdf, distance_col='distance')
+    #         sjoin['weight'] = sjoin['population'] / sjoin['distance'] / sjoin['distance']
+    #         return sjoin['weight'].idxmax()
         
-        gdf['town_id'] = gdf.apply(lambda s : get_closest_city(s.name), axis=1)
-        return gdf
+    #     gdf['town_id'] = gdf.apply(lambda s : get_closest_city(s.name), axis=1)
+    #     return gdf
 
     def get_territories_gdf(self) -> gpd.GeoDataFrame:
         data = [territory.to_dict() for territory in self.territories]
