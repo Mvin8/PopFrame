@@ -8,12 +8,6 @@ from .town import Town
 from .territory import Territory
 import matplotlib.pyplot as plt
 
-# DISTRICTS_PLOT_COLOR = '#893434'
-# SETTLEMENTS_PLOT_COLOR = '#ddd'
-# TOWNS_PLOT_COLOR = '#333333'
-# TERRITORIES_PLOT_COLOR = '#28486d'
-
-
 
 DISTRICTS_PLOT_COLOR = '#28486d'
 SETTLEMENTS_PLOT_COLOR = '#ddd'
@@ -21,7 +15,75 @@ TOWNS_PLOT_COLOR = '#333333'
 TERRITORIES_PLOT_COLOR = '#893434'
 
 class Region():
+    """
+    A class representing a geographical region that includes districts, settlements, towns, and optionally territories.
+    Provides methods for validating and visualizing spatial data, as well as for calculating accessibility between towns.
+
+    Attributes
+    ----------
+    crs : pyproj.CRS
+        Coordinate Reference System of the region.
+    region : gpd.GeoDataFrame
+        GeoDataFrame representing the boundaries of the region.
+    districts : gpd.GeoDataFrame
+        GeoDataFrame containing information about districts.
+    settlements : gpd.GeoDataFrame
+        GeoDataFrame containing information about settlements.
+    _towns : dict
+        Dictionary containing `Town` objects indexed by their IDs.
+    accessibility_matrix : pd.DataFrame
+        DataFrame containing accessibility data between towns.
+    _territories : dict
+        Dictionary containing `Territory` objects indexed by their IDs (optional).
+
+    Methods
+    -------
+    validate_districts(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame
+        Validates the structure and content of a districts GeoDataFrame.
+        
+    validate_settlements(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame
+        Validates the structure and content of a settlements GeoDataFrame.
+        
+    validate_towns(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame
+        Validates the structure and content of a towns GeoDataFrame.
+        
+    validate_region(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame
+        Validates the structure and content of a region GeoDataFrame.
+        
+    validate_accessibility_matrix(df: pd.DataFrame) -> pd.DataFrame
+        Validates the structure and content of the accessibility matrix.
     
+    plot(figsize=(15, 15))
+        Visualizes the region, including districts, settlements, towns, and optionally territories.
+
+    get_territory(territory_id: int) -> Territory
+        Retrieves a territory by its ID.
+    
+    towns() -> list[Town]
+        Returns a list of all towns in the region.
+    
+    territories() -> list[Territory]
+        Returns a list of all territories in the region.
+
+    geometry() -> shapely.Polygon | shapely.MultiPolygon
+        Returns the unified geometry of all districts in the region.
+    
+    get_territories_gdf() -> gpd.GeoDataFrame
+        Returns a GeoDataFrame representing all territories in the region.
+    
+    get_towns_gdf() -> gpd.GeoDataFrame
+        Returns a GeoDataFrame representing all towns in the region.
+
+    __getitem__(arg)
+        Overloads the subscript operator to access a town or accessibility data based on the argument type.
+    
+    from_pickle(file_path: str) -> Region
+        Loads a `Region` object from a .pickle file.
+    
+    to_pickle(file_path: str)
+        Saves the `Region` object to a .pickle file.
+    """
+
     def __init__(
             self, 
             region : gpd.GeoDataFrame, 
@@ -31,7 +93,30 @@ class Region():
             accessibility_matrix : pd.DataFrame, 
             territories : gpd.GeoDataFrame | None = None
         ):
-        
+        """
+        Initializes the Region object with GeoDataFrames for region, districts, settlements, and towns. 
+        Optionally includes territories and an accessibility matrix to model transportation between towns.
+
+        Parameters
+        ----------
+        region : gpd.GeoDataFrame
+            GeoDataFrame representing the boundaries of the region.
+        districts : gpd.GeoDataFrame
+            GeoDataFrame containing information about districts.
+        settlements : gpd.GeoDataFrame
+            GeoDataFrame containing information about settlements.
+        towns : gpd.GeoDataFrame
+            GeoDataFrame containing information about towns.
+        accessibility_matrix : pd.DataFrame
+            DataFrame containing accessibility data between towns.
+        territories : gpd.GeoDataFrame, optional
+            GeoDataFrame containing information about territories (default is None).
+
+        Raises
+        ------
+        AssertionError
+            If the CRS or indices between the towns and the accessibility matrix do not match.
+        """
         region = self.validate_region(region)
         districts = self.validate_districts(districts)
         settlements = self.validate_settlements(settlements)
@@ -56,6 +141,24 @@ class Region():
 
     @staticmethod
     def validate_districts(gdf : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """
+        Validates the districts GeoDataFrame to ensure it has the correct structure and data types.
+
+        Parameters
+        ----------
+        gdf : gpd.GeoDataFrame
+            The GeoDataFrame containing district data.
+
+        Returns
+        -------
+        gpd.GeoDataFrame
+            Validated GeoDataFrame with 'geometry' and 'name' columns.
+
+        Raises
+        ------
+        AssertionError
+            If the GeoDataFrame is not of the expected format or types.
+        """
         assert isinstance(gdf, gpd.GeoDataFrame), 'Districts should be instance of gpd.GeoDataFrame'
         assert gdf.geom_type.isin(['Polygon', 'MultiPolygon']).all(), 'District geometry should be Polygon or MultiPolygon'
         assert pd.api.types.is_string_dtype(gdf['name']), 'District name should be str'
@@ -63,6 +166,9 @@ class Region():
 
     @staticmethod
     def validate_settlements(gdf : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """
+        Validates the settlements GeoDataFrame to ensure it has the correct structure and data types.
+        """
         assert isinstance(gdf, gpd.GeoDataFrame), 'Settlements should be instance of gpd.GeoDataFrame'
         assert gdf.geom_type.isin(['Polygon', 'MultiPolygon']).all(), 'Settlement geometry should be Polygon or MultiPolygon'
         assert pd.api.types.is_string_dtype(gdf['name']), 'Settlement name should be str'
@@ -70,11 +176,17 @@ class Region():
     
     @staticmethod
     def validate_towns(gdf : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """
+        Validates the towns GeoDataFrame.
+        """
         assert isinstance(gdf, gpd.GeoDataFrame), 'Towns should be instance of gpd.GeoDataFrame'
         return gdf
 
     @staticmethod
     def validate_region(gdf : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """
+        Validates the region GeoDataFrame to ensure it has the correct structure and data types.
+        """
         assert isinstance(gdf, gpd.GeoDataFrame), 'Region should be instance of gpd.GeoDataFrame'
         assert gdf.geom_type.isin(['Polygon', 'MultiPolygon']).all(), 'District geometry should be Polygon or MultiPolygon'
         assert pd.api.types.is_string_dtype(gdf['name']), 'District name should be str'
@@ -82,12 +194,24 @@ class Region():
     
     @staticmethod
     def validate_accessibility_matrix(df : pd.DataFrame) -> pd.DataFrame:
+        """
+        Validates the accessibility matrix, ensuring it has non-negative float values 
+        and matching row and column indices.
+        """
         assert pd.api.types.is_float_dtype(df.values), 'Accessibility matrix values should be float'
         assert (df.values>=0).all(), 'Accessibility matrix values should be greater or equal 0'
         assert (df.index == df.columns).all(), "Accessibility matrix indices and columns don't match"
         return df
 
     def plot(self, figsize=(15, 15)):
+        """
+        Plots the region, including districts, settlements, towns, and optionally territories, on a map.
+        
+        Parameters
+        ----------
+        figsize : tuple, optional
+            The size of the plot (default is (15, 15)).
+        """
         sett_to_dist = self.settlements.copy()
         sett_to_dist.geometry = sett_to_dist.representative_point()
         sett_to_dist = sett_to_dist.sjoin(self.districts).rename(columns={
@@ -127,41 +251,85 @@ class Region():
 
     
     def get_territory(self, territory_id : int):
+        """
+        Retrieves a specific territory by its ID.
+
+        Parameters
+        ----------
+        territory_id : int
+            The ID of the territory.
+
+        Returns
+        -------
+        Territory
+            The requested territory.
+
+        Raises
+        ------
+        KeyError
+            If the territory with the given ID is not found.
+        """
         if not territory_id in self._territories:
             raise KeyError(f"Can't find territory with such id: {territory_id}")
         return self._territories[territory_id]
 
     @property
     def towns(self) -> list[Town]:
+        """
+        Returns a list of all towns in the region.
+
+        Returns
+        -------
+        list[Town]
+            List of Town objects.
+        """
         return self._towns.values()
     
     @property
     def territories(self) -> list[Territory]:
+        """
+        Returns a list of all territories in the region.
+
+        Returns
+        -------
+        list[Territory]
+            List of Territory objects.
+        """
         return self._territories.values()
 
     @property
     def geometry(self) -> shapely.Polygon | shapely.MultiPolygon:
+        """
+        Returns the unified geometry of all districts in the region, transformed to the WGS84 CRS (EPSG:4326).
+
+        Returns
+        -------
+        shapely.Polygon or shapely.MultiPolygon
+            The unified geometry of the region.
+        """
         return self.districts.to_crs(4326).unary_union
-    
-    # def match_services_towns(self, gdf : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    #     assert gdf.crs == self.crs, 'Services GeoDataFrame CRS should match region CRS'
-    #     gdf = gdf.copy()
-    #     towns_gdf = self.get_towns_gdf()[['geometry', 'population']]
-        
-    #     def get_closest_city(service_i):
-    #         service_gdf = gdf[gdf.index == service_i]
-    #         sjoin = towns_gdf.sjoin_nearest(service_gdf, distance_col='distance')
-    #         sjoin['weight'] = sjoin['population'] / sjoin['distance'] / sjoin['distance']
-    #         return sjoin['weight'].idxmax()
-        
-    #     gdf['town_id'] = gdf.apply(lambda s : get_closest_city(s.name), axis=1)
-    #     return gdf
 
     def get_territories_gdf(self) -> gpd.GeoDataFrame:
+        """
+        Returns a GeoDataFrame representing all territories in the region.
+
+        Returns
+        -------
+        gpd.GeoDataFrame
+            GeoDataFrame with territory data.
+        """
         data = [territory.to_dict() for territory in self.territories]
         return gpd.GeoDataFrame(data, crs=self.crs).set_index('id', drop=True)
 
     def get_towns_gdf(self) -> gpd.GeoDataFrame:
+        """
+        Returns a GeoDataFrame representing all towns in the region, including their relationships with settlements and districts.
+
+        Returns
+        -------
+        gpd.GeoDataFrame
+            GeoDataFrame with town data.
+        """
         data = [town.to_dict() for town in self.towns]
         gdf = gpd.GeoDataFrame(data, crs=self.crs)
         gdf = gdf.sjoin(
@@ -182,6 +350,19 @@ class Region():
 
     @singledispatchmethod
     def __getitem__(self, arg):
+        """
+        Overloaded subscript operator to access a town or accessibility data based on the argument type.
+        
+        Parameters
+        ----------
+        arg : int or tuple
+            Integer to access a town by its ID, or tuple to retrieve accessibility data between two towns.
+        
+        Raises
+        ------
+        NotImplementedError
+            If the argument type is unsupported.
+        """
         raise NotImplementedError(f"Can't access object with such argument type {type(arg)}")
 
     # Make city_model subscriptable, to access block via ID like city_model[123]
@@ -202,13 +383,32 @@ class Region():
     
     @staticmethod
     def from_pickle(file_path: str):
-        """Load region model from a .pickle file"""
+        """
+        Load a Region object from a .pickle file.
+
+        Parameters
+        ----------
+        file_path : str
+            Path to the .pickle file.
+
+        Returns
+        -------
+        Region
+            The loaded Region object.
+        """
         state = None
         with open(file_path, "rb") as f:
             state = pickle.load(f)
         return state
 
     def to_pickle(self, file_path: str):
-        """Save region model to a .pickle file"""
+        """
+        Save the Region object to a .pickle file.
+
+        Parameters
+        ----------
+        file_path : str
+            Path to the .pickle file.
+        """
         with open(file_path, "wb") as f:
             pickle.dump(self, f)
