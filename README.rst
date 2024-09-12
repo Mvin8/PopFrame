@@ -101,11 +101,21 @@ Acknowledgments
 
 Contacts
 --------
-Your contacts. For example:
 
-- `Telegram channel <https://t.me/>`_ answering questions about your project
-- `VK group <https://vk.com/>`_ your VK group
-- etc.
+.. contacts-start
+
+You can contact us:
+
+-  `NCCR <https://actcognitive.org/o-tsentre/kontakty>`__ - National
+   Center for Cognitive Research
+-  `IDU <https://idu.itmo.ru/en/contacts/contacts.htm>`__ - Institute of
+   Design and Urban Studies
+-  `Tatiana Churiakova <https://t.me/tanya_chk>`__ - project manager
+-  `Vasilii Starikov <https://t.me/vasilstar>`__ - lead software engineer
+
+Also, you are welcomed to our `issues <https://github.com/aimclub/blocksnet/issues>`__ section!
+
+.. contacts-end
 
 
 Citation
