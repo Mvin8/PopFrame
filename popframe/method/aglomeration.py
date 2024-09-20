@@ -7,47 +7,19 @@ from scipy.spatial import Voronoi
 from shapely.ops import unary_union
 import numpy as np
 from .base_method import BaseMethod
+from shapely.ops import polygonize
 
 class AgglomerationAnalysis(BaseMethod):
     
     def detect_agglomerations(self, G):
-        """
-        Применение алгоритма Лувена для обнаружения сообществ.
-        
-        Параметры:
-        G (networkx.Graph): Входной граф с узлами и рёбрами.
-        
-        Возвращает:
-        dict: Словарь, где ключи — индексы узлов, а значения — id агломераций.
-        """
         partition = community_louvain.best_partition(G)
         return partition
 
     def get_largest_city_name(self, towns_gdf, nodes):
-        """
-        Нахождение названия крупнейшего города среди заданных узлов.
-        
-        Параметры:
-        towns_gdf (GeoDataFrame): GeoDataFrame с информацией о городах.
-        nodes (list): Список узлов для анализа.
-        
-        Возвращает:
-        str: Название крупнейшего города.
-        """
         largest_city = towns_gdf.loc[nodes].sort_values(by='population', ascending=False).iloc[0]
         return largest_city['name']
 
     def create_voronoi_polygons(self, towns_gdf, boundary_gdf):
-        """
-        Создает полигоны Вороного и обрезает их по границе региона.
-        
-        Параметры:
-        towns_gdf (GeoDataFrame): GeoDataFrame с информацией о городах.
-        boundary_gdf (GeoDataFrame): GeoDataFrame с границами региона.
-        
-        Возвращает:
-        GeoDataFrame: GeoDataFrame с обрезанными полигонами Вороного и индексами узлов.
-        """
         points = np.array([point.coords[0] for point in towns_gdf.geometry])
         vor = Voronoi(points)
         polygons = []
@@ -65,17 +37,6 @@ class AgglomerationAnalysis(BaseMethod):
         return gpd.GeoDataFrame({'geometry': polygons, 'node_index': node_indices}, crs=towns_gdf.crs)
 
     def build_agglomeration_voronoi(self, G):
-        """
-        Строит полигоны Вороного для агломераций и возвращает GeoDataFrame с крупнейшими городами.
-        
-        Параметры:
-        G (networkx.Graph): Входной граф с узлами и рёбрами.
-        towns_gdf (GeoDataFrame): GeoDataFrame с информацией о городах.
-        boundary_gdf (GeoDataFrame): GeoDataFrame с границами региона.
-        
-        Возвращает:
-        GeoDataFrame: GeoDataFrame с полигонами агломераций и именами крупнейших городов.
-        """
         boundary_gdf = self.region.region
         towns_gdf = self.region.get_towns_gdf()
 
@@ -95,20 +56,23 @@ class AgglomerationAnalysis(BaseMethod):
             agglomeration_polygons = voronoi_gdf[voronoi_gdf['node_index'].isin(nodes)].geometry
             if len(agglomeration_polygons) > 0:
                 union_polygon = unary_union(agglomeration_polygons)
-                name = self.get_largest_city_name(towns_gdf, nodes)
-                polygons.append(union_polygon)
-                names.append(name)
+                separate_polygons = list(polygonize(union_polygon))
+                
+                for polygon in separate_polygons:
+                    cities_within_polygon = towns_gdf[towns_gdf.geometry.within(polygon)]
+                    
+                    if not cities_within_polygon.empty:
+                        largest_city = cities_within_polygon.sort_values(by='population', ascending=False).iloc[0]['name']
+                    else:
+                        continue  # Если городов нет, пропускаем этот полигон и не добавляем его в результирующий GeoDataFrame
+                    
+                    polygons.append(polygon)
+                    names.append(largest_city)
         
         agglomeration_gdf = gpd.GeoDataFrame({'name': names, 'geometry': polygons}, crs=towns_gdf.crs)
         return agglomeration_gdf
-
+    
     def visualize_agglomerations(self, G):
-        """
-        Визуализирует агломерации на графе.
-        
-        Параметры:
-        G (networkx.Graph): Входной граф с узлами и рёбрами.
-        """
         partition = self.detect_agglomerations(G)
         pos = nx.get_node_attributes(G, 'pos')
         cmap = plt.cm.get_cmap('viridis', max(partition.values()) + 1)
