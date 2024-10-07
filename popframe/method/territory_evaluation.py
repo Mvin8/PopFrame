@@ -10,7 +10,7 @@ import json
 from io import StringIO
 
 
-from ..models.region_old import Town
+from ..models.region import Town
 from .base_method import BaseMethod
 
 
