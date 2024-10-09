@@ -11,7 +11,7 @@ from io import StringIO
 import matplotlib.pyplot as plt
 import contextily as ctx
 from matplotlib.lines import Line2D
-from ..models.region_old import Town
+from ..models.region import Town
 from .base_method import BaseMethod
 import math
 

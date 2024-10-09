@@ -93,19 +93,48 @@ class TerritoryEvaluation(BaseMethod):
 
 
     def evaluate_territory_location(self, territories):
-        settlements_gdf = self.region.get_towns_gdf()
-        territories_gdf = territories
-        if territories is None:
-            territories_gdf = self.region.get_territories_gdf()
+        """
+        Main function to evaluate the location of a territory relative to settlements.
 
-        # Преобразование системы координат
+        Parameters:
+            self: The class object containing methods to retrieve settlements and territories.
+            territories (GeoDataFrame): Geospatial data with territories. If None, territories from self.region will be used.
+
+        Returns:
+            list: A list of evaluation results for each territory.
+        """
+        settlements_gdf = self.region.get_towns_gdf()
+        territories_gdf = territories if territories is not None else self.region.get_territories_gdf()
+
+        # Coordinate system transformation
         settlements_gdf = settlements_gdf.to_crs(epsg=3857)
         territories_gdf = territories_gdf.to_crs(epsg=3857)
 
+        # Dictionary with settlement level scores
+        level_scores = self._get_level_scores()
+
         results = []
 
-        # Определение оценок для каждого уровня
-        level_scores = {
+        # Process each territory
+        for territory in territories_gdf.itertuples():
+            territory_name = getattr(territory, "name", "None")
+            territory_geom = territory.geometry
+
+            # Territory evaluation
+            result = self._evaluate_single_territory(territory_geom, territory_name, settlements_gdf, level_scores)
+            results.append(result)
+
+        return results
+
+
+    def _get_level_scores(self):
+        """
+        Returns a dictionary with scores for different levels of settlements.
+
+        Returns:
+            dict: A dictionary where the key is the settlement level and the value is the score.
+        """
+        return {
             "Сверхкрупный город": 10,
             "Крупнейший город": 9,
             "Крупный город": 8,
@@ -118,92 +147,128 @@ class TerritoryEvaluation(BaseMethod):
             "Малое сельское поселение": 1,
         }
 
-        # Создаем общий буфер в 10 км вокруг каждой территории
-        for territory in territories_gdf.itertuples():
-            territory_name = getattr(territory, "name", "None")
-            territory_geom = territory.geometry
-            buffer = territory_geom.buffer(10000)
 
-            # Получаем населенные пункты, которые попадают в этот буфер
-            settlements_in_buffer = settlements_gdf[settlements_gdf.geometry.intersects(buffer)]
+    def _evaluate_single_territory(self, territory_geom, territory_name, settlements_gdf, level_scores):
+        """
+        Evaluates a single territory, determining its nearest settlements and interpretation.
 
-            if not settlements_in_buffer.empty:
-                # Находим населенный пункт с максимальным уровнем
-                settlements_in_buffer['score'] = settlements_in_buffer['level'].map(level_scores)
-                max_settlement = settlements_in_buffer.loc[settlements_in_buffer['score'].idxmax()]
-                max_level = max_settlement['level']
-                max_score = max_settlement['score']
-                closest_settlement_name = max_settlement['name']
+        Parameters:
+            territory_geom (geometry): The geometry of the territory.
+            territory_name (str): The name of the territory.
+            settlements_gdf (GeoDataFrame): Geospatial data with settlements.
+            level_scores (dict): A dictionary with settlement level scores.
 
-                interpretation = f"Территория находится внутри или непосредственной близости населенного пункта уровня {max_level}"
-                
-                results.append({
+        Returns:
+            dict: The results of the territory evaluation.
+        """
+        buffer = territory_geom.buffer(10000)
+        settlements_in_buffer = settlements_gdf[settlements_gdf.geometry.intersects(buffer)]
+
+        if not settlements_in_buffer.empty:
+            return self._evaluate_nearby_settlement(territory_name, settlements_in_buffer, level_scores)
+        else:
+            return self._evaluate_between_settlements(territory_geom, territory_name, settlements_gdf)
+
+
+    def _evaluate_nearby_settlement(self, territory_name, settlements_in_buffer, level_scores):
+        """
+        Evaluates the territory if it is near settlements.
+
+        Parameters:
+            territory_name (str): The name of the territory.
+            settlements_in_buffer (GeoDataFrame): The settlements within the buffer.
+            level_scores (dict): A dictionary with settlement level scores.
+
+        Returns:
+            dict: The results of the territory evaluation.
+        """
+        settlements_in_buffer['score'] = settlements_in_buffer['level'].map(level_scores)
+        max_settlement = settlements_in_buffer.loc[settlements_in_buffer['score'].idxmax()]
+        max_level = max_settlement['level']
+        max_score = max_settlement['score']
+        closest_settlement_name = max_settlement['name']
+
+        interpretation = f"Территория находится внутри или непосредственной близости населенного пункта уровня {max_level}"
+        return {
+            "territory": territory_name,
+            "score": max_score,
+            "interpretation": interpretation,
+            "closest_settlement": closest_settlement_name,
+            "closest_settlement1": None,
+            "closest_settlement2": None
+        }
+
+
+    def _evaluate_between_settlements(self, territory_geom, territory_name, settlements_gdf):
+        """
+        Evaluates the territory if it is located between settlements.
+
+        Parameters:
+            territory_geom (geometry): The geometry of the territory.
+            territory_name (str): The name of the territory.
+            settlements_gdf (GeoDataFrame): Geospatial data with settlements.
+
+        Returns:
+            dict: The results of the territory evaluation.
+        """
+        buffer_20km = territory_geom.buffer(30000)
+        nearby_settlements = settlements_gdf[settlements_gdf.geometry.intersects(buffer_20km)]
+
+        if len(nearby_settlements) > 1:
+            closest_settlement1, closest_settlement2 = self._find_closest_settlement_pair(territory_geom, nearby_settlements)
+
+            if closest_settlement1 and closest_settlement2:
+                interpretation = "Территория находится между основными ядрами системы расселения"
+                return {
                     "territory": territory_name,
-                    "score": max_score,
+                    "score": 1,
                     "interpretation": interpretation,
-                    "closest_settlement": closest_settlement_name,
-                    "closest_settlement1": None,
-                    "closest_settlement2": None
-                })
-            else:
-                # Если в буфере не найдено городов, проверяем между какими городами расположена территория
+                    "closest_settlement": None,
+                    "closest_settlement1": closest_settlement1.name,
+                    "closest_settlement2": closest_settlement2.name
+                }
+        
+        return {
+            "territory": territory_name,
+            "score": 0,
+            "interpretation": "Территория находится за границей агломерации",
+            "closest_settlement": None,
+            "closest_settlement1": None,
+            "closest_settlement2": None
+        }
 
-                # Создаем буфер радиусом 20 км вокруг территории
-                buffer_20km = territory_geom.buffer(30000)
-                nearby_settlements = settlements_gdf[settlements_gdf.geometry.intersects(buffer_20km)]
 
-                if len(nearby_settlements) > 1:
-                    min_distance = float('inf')
-                    closest_settlement1 = None
-                    closest_settlement2 = None
-                    highest_score = 1
-                    interpretation = ""
+    def _find_closest_settlement_pair(self, territory_geom, nearby_settlements):
+        """
+        Finds the pair of nearest settlements around the territory.
 
-                    # Проверка пар населенных пунктов только в радиусе 20 км
-                    for settlement1, settlement2 in combinations(nearby_settlements.itertuples(), 2):
-                        distance_between_settlements = settlement1.geometry.distance(settlement2.geometry)
-                        distance_to_settlement1 = territory_geom.distance(settlement1.geometry)
-                        distance_to_settlement2 = territory_geom.distance(settlement2.geometry)
-                        total_distance = distance_to_settlement1 + distance_to_settlement2
+        Parameters:
+            territory_geom (geometry): The geometry of the territory.
+            nearby_settlements (GeoDataFrame): The nearby settlements.
 
-                        if (distance_to_settlement1 > 10000 and distance_to_settlement2 > 10000 and
-                                total_distance <= 1.2 * distance_between_settlements and
-                                total_distance < min_distance):
-                            min_distance = total_distance
-                            closest_settlement1 = settlement1
-                            closest_settlement2 = settlement2
-                            interpretation = "Территория находится между основными ядрами системы расселения"
+        Returns:
+            tuple: The pair of nearest settlements and the minimum distance.
+        """
+        from itertools import combinations
 
-                    # Возвращение результатов, если найдена подходящая пара
-                    if closest_settlement1 and closest_settlement2:
-                        results.append({
-                            "territory": territory_name,
-                            "score": highest_score,
-                            "interpretation": interpretation,
-                            "closest_settlement": None,
-                            "closest_settlement1": closest_settlement1.name,
-                            "closest_settlement2": closest_settlement2.name
-                        })
-                    else:
-                        results.append({
-                            "territory": territory_name,
-                            "score": 0,
-                            "interpretation": "Территория находится за границей агломерации",
-                            "closest_settlement": None,
-                            "closest_settlement1": None,
-                            "closest_settlement2": None
-                        })
-                else:
-                    results.append({
-                        "territory": territory_name,
-                        "score": 0,
-                        "interpretation": "Территория находится за границей агломерации",
-                        "closest_settlement": None,
-                        "closest_settlement1": None,
-                        "closest_settlement2": None
-                    })
+        min_distance = float('inf')
+        closest_settlement1 = None
+        closest_settlement2 = None
 
-        return results
+        for settlement1, settlement2 in combinations(nearby_settlements.itertuples(), 2):
+            distance_between_settlements = settlement1.geometry.distance(settlement2.geometry)
+            distance_to_settlement1 = territory_geom.distance(settlement1.geometry)
+            distance_to_settlement2 = territory_geom.distance(settlement2.geometry)
+            total_distance = distance_to_settlement1 + distance_to_settlement2
+
+            if (distance_to_settlement1 > 10000 and distance_to_settlement2 > 10000 and
+                    total_distance <= 1.2 * distance_between_settlements and
+                    total_distance < min_distance):
+                min_distance = total_distance
+                closest_settlement1 = settlement1
+                closest_settlement2 = settlement2
+
+        return closest_settlement1, closest_settlement2
        
     def population_criterion(self, territories):
         """
