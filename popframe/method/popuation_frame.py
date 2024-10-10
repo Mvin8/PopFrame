@@ -11,7 +11,7 @@ from shapely.geometry import Point, Polygon
 
 from .base_method import BaseMethod
 
-class PopFrame(BaseMethod):
+class PopulationFrame(BaseMethod):
     """Class provides methods for network analysis on geographic data"""
 
     def _initialize_graph(self, towns: gpd.GeoDataFrame):

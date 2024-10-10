@@ -35,7 +35,9 @@ dependencies = [
     "tqdm==4.65.0",
     "seaborn==0.12.2",
     "folium==0.14.0",
-    "dill==0.3.8" 
+    "dill==0.3.8", 
+    "python-louvain"
+
 ]
 
 classifiers = [
