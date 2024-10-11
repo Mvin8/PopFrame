@@ -130,7 +130,8 @@ class Region():
         """
         data = [town.to_dict() for town in self.towns]
         gdf = gpd.GeoDataFrame(data, crs=self.crs)
-     
+        gdf.set_index('id', inplace=True, drop=False)
+        gdf = gdf.rename_axis(None)
         return gdf.fillna(0)
 
     @singledispatchmethod
