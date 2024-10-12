@@ -1,0 +1,35 @@
+﻿popframe.method
+===============
+
+.. automodule:: popframe.method
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :recursive:
+
+   popframe.method.aglomeration
+   popframe.method.base_method
+   popframe.method.popuation_frame
+   popframe.method.territory_evaluation
+   popframe.method.urbanisation_level
+

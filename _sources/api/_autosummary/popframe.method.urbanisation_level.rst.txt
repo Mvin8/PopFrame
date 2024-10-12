@@ -1,0 +1,29 @@
+popframe.method.urbanisation\_level
+===================================
+
+.. automodule:: popframe.method.urbanisation_level
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      UrbanisationLevel
+   
+   
+
+   
+   
+   
+
+
+

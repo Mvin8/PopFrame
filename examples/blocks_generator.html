@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Препроцессинг данных &mdash; PopFrame 0.0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/nbsphinx-code-cells.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Examples" href="methods/index.html" />
+    <link rel="prev" title="Examples" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            PopFrame
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../popframe/contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../popframe/faq.html">FAQ</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Examples</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Препроцессинг данных</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Создание-модели">Создание модели</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Работа-с-моделью---Создание-каркаса">Работа с моделью - Создание каркаса</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#Кракас-населения---версия-2">Кракас населения - версия 2</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="methods/index.html">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">API documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../about_us.html">About us</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PopFrame</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Examples</a></li>
+      <li class="breadcrumb-item active">Препроцессинг данных</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/examples/blocks_generator.nblink.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[22]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># import osmnx as ox</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">geopandas</span> <span class="k">as</span> <span class="nn">gpd</span>
+<span class="kn">import</span> <span class="nn">networkx</span> <span class="k">as</span> <span class="nn">nx</span>
+
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">stderr</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">devnull</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span>
+
+<span class="c1"># local crs</span>
+<span class="n">local_crs</span> <span class="o">=</span> <span class="mi">32636</span>
+<span class="c1"># path to data</span>
+</pre></div>
+</div>
+</div>
+<section id="Препроцессинг-данных">
+<h1>Препроцессинг данных<a class="headerlink" href="#Препроцессинг-данных" title="Permalink to this heading"></a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[32]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">graph</span> <span class="o">=</span> <span class="n">nx</span><span class="o">.</span><span class="n">read_graphml</span><span class="p">(</span><span class="s1">&#39;data/graph.graphml&#39;</span><span class="p">)</span>
+<span class="n">graph_crs</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">graph</span><span class="p">[</span><span class="s1">&#39;crs&#39;</span><span class="p">]</span>
+<span class="n">okrugs</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="s1">&#39;data/model_data/okrugs.parquet&#39;</span><span class="p">)</span>
+<span class="n">rayons</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="s1">&#39;data/model_data/rayons.parquet&#39;</span><span class="p">)</span>
+<span class="n">territories</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s1">&#39;data/territories/shlis.geojson&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">to_crs</span><span class="p">(</span><span class="n">graph_crs</span><span class="p">)</span>
+<span class="n">towns</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="s1">&#39;/Users/mvin/Code/PopFrame/examples/data/model_data/towns.parquet&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">to_crs</span><span class="p">(</span><span class="n">graph_crs</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[33]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">popframe.preprocessing.level_filler</span> <span class="kn">import</span> <span class="n">LevelFiller</span>
+<span class="n">level_filler</span> <span class="o">=</span> <span class="n">LevelFiller</span><span class="p">(</span><span class="n">towns</span><span class="o">=</span><span class="n">towns</span><span class="p">)</span>
+<span class="n">towns</span> <span class="o">=</span> <span class="n">level_filler</span><span class="o">.</span><span class="n">fill_levels</span><span class="p">()</span>
+<span class="n">towns</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[33]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>geometry</th>
+      <th>name</th>
+      <th>population</th>
+      <th>level</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>POINT (543142.339 6580637.744)</td>
+      <td>Болото</td>
+      <td>111</td>
+      <td>Малое сельское поселение</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>POINT (544532.929 6593228.214)</td>
+      <td>Большой Остров</td>
+      <td>116</td>
+      <td>Малое сельское поселение</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>POINT (544895.402 6593052.876)</td>
+      <td>Бор</td>
+      <td>116</td>
+      <td>Малое сельское поселение</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>POINT (543993.111 6589582.121)</td>
+      <td>Бороватое</td>
+      <td>114</td>
+      <td>Малое сельское поселение</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>POINT (538540.110 6576793.684)</td>
+      <td>Бочево</td>
+      <td>108</td>
+      <td>Малое сельское поселение</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>2926</th>
+      <td>POINT (399059.742 6560341.471)</td>
+      <td>Апраксин Бор</td>
+      <td>96</td>
+      <td>Малое сельское поселение</td>
+    </tr>
+    <tr>
+      <th>2927</th>
+      <td>POINT (403967.171 6562087.081)</td>
+      <td>Александровка</td>
+      <td>98</td>
+      <td>Малое сельское поселение</td>
+    </tr>
+    <tr>
+      <th>2928</th>
+      <td>POINT (413116.740 6573793.279)</td>
+      <td>Большая Горка</td>
+      <td>100</td>
+      <td>Малое сельское поселение</td>
+    </tr>
+    <tr>
+      <th>2929</th>
+      <td>POINT (412458.032 6574811.307)</td>
+      <td>Дроздово</td>
+      <td>101</td>
+      <td>Малое сельское поселение</td>
+    </tr>
+    <tr>
+      <th>2930</th>
+      <td>POINT (412158.909 6574630.200)</td>
+      <td>Большая Кунесть</td>
+      <td>101</td>
+      <td>Малое сельское поселение</td>
+    </tr>
+  </tbody>
+</table>
+<p>2931 rows × 4 columns</p>
+</div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">popframe.preprocessing.adjacency_calculator</span> <span class="kn">import</span> <span class="n">AdjacencyCalculator</span>
+
+<span class="k">try</span><span class="p">:</span>
+  <span class="n">adj_mx</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_pickle</span><span class="p">(</span><span class="s1">&#39;data/adj_mx.pkl&#39;</span><span class="p">)</span>
+<span class="k">except</span><span class="p">:</span>
+  <span class="kn">from</span> <span class="nn">popframe.preprocessing.adjacency_calculator</span> <span class="kn">import</span> <span class="n">AdjacencyCalculator</span>
+  <span class="n">blocks</span> <span class="o">=</span> <span class="n">towns</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+  <span class="n">blocks</span><span class="o">.</span><span class="n">geometry</span> <span class="o">=</span> <span class="n">blocks</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">buffer</span><span class="p">(</span><span class="mf">0.01</span><span class="p">)</span>
+  <span class="n">ac</span> <span class="o">=</span> <span class="n">AdjacencyCalculator</span><span class="p">(</span><span class="n">blocks</span><span class="o">=</span><span class="n">blocks</span><span class="p">,</span> <span class="n">graph</span><span class="o">=</span><span class="n">graph</span><span class="p">)</span>
+  <span class="n">adj_mx</span> <span class="o">=</span> <span class="n">ac</span><span class="o">.</span><span class="n">get_dataframe</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<script type="text/javascript">
+<!--
+
+{
+        var element = document.getElementById('NetworKit_script');
+        if (element) {
+                element.parentNode.removeChild(element);
+        }
+        element = document.createElement('script');
+        element.type = 'text/javascript';
+        element.innerHTML = 'function NetworKit_pageEmbed(id) { var i, j; var elements; elements = document.getElementById(id).getElementsByClassName("Plot"); for (i=0; i<elements.length; i++) { elements[i].id = id + "_Plot_" + i; var data = elements[i].getAttribute("data-image").split("|"); elements[i].removeAttribute("data-image"); var content = "<div class=\\"Image\\" id=\\"" + elements[i].id + "_Image\\" />"; elements[i].innerHTML = content; elements[i].setAttribute("data-image-index", 0); elements[i].setAttribute("data-image-length", data.length); for (j=0; j<data.length; j++) { elements[i].setAttribute("data-image-" + j, data[j]); } NetworKit_plotUpdate(elements[i]); elements[i].onclick = function (e) { NetworKit_overlayShow((e.target) ? e.target : e.srcElement); } } elements = document.getElementById(id).getElementsByClassName("HeatCell"); for (i=0; i<elements.length; i++) { var data = parseFloat(elements[i].getAttribute("data-heat")); var color = "#00FF00"; if (data <= 1 && data > 0) { color = "hsla(0, 100%, 75%, " + (data) + ")"; } else if (data <= 0 && data >= -1) { color = "hsla(240, 100%, 75%, " + (-data) + ")"; } elements[i].style.backgroundColor = color; } elements = document.getElementById(id).getElementsByClassName("Details"); for (i=0; i<elements.length; i++) { elements[i].setAttribute("data-title", "-"); NetworKit_toggleDetails(elements[i]); elements[i].onclick = function (e) { NetworKit_toggleDetails((e.target) ? e.target : e.srcElement); } } elements = document.getElementById(id).getElementsByClassName("MathValue"); for (i=elements.length-1; i>=0; i--) { value = elements[i].innerHTML.trim(); if (value === "nan") { elements[i].parentNode.innerHTML = "" } } elements = document.getElementById(id).getElementsByClassName("SubCategory"); for (i=elements.length-1; i>=0; i--) { value = elements[i].innerHTML.trim(); if (value === "") { elements[i].parentNode.removeChild(elements[i]) } } elements = document.getElementById(id).getElementsByClassName("Category"); for (i=elements.length-1; i>=0; i--) { value = elements[i].innerHTML.trim(); if (value === "") { elements[i].parentNode.removeChild(elements[i]) } } var isFirefox = false; try { isFirefox = typeof InstallTrigger !== "undefined"; } catch (e) {} if (!isFirefox) { alert("Currently the function\'s output is only fully supported by Firefox."); } } function NetworKit_plotUpdate(source) { var index = source.getAttribute("data-image-index"); var data = source.getAttribute("data-image-" + index); var image = document.getElementById(source.id + "_Image"); image.style.backgroundImage = "url(" + data + ")"; } function NetworKit_showElement(id, show) { var element = document.getElementById(id); element.style.display = (show) ? "block" : "none"; } function NetworKit_overlayShow(source) { NetworKit_overlayUpdate(source); NetworKit_showElement("NetworKit_Overlay", true); } function NetworKit_overlayUpdate(source) { document.getElementById("NetworKit_Overlay_Title").innerHTML = source.title; var index = source.getAttribute("data-image-index"); var data = source.getAttribute("data-image-" + index); var image = document.getElementById("NetworKit_Overlay_Image"); image.setAttribute("data-id", source.id); image.style.backgroundImage = "url(" + data + ")"; var link = document.getElementById("NetworKit_Overlay_Toolbar_Bottom_Save"); link.href = data; link.download = source.title + ".svg"; } function NetworKit_overlayImageShift(delta) { var image = document.getElementById("NetworKit_Overlay_Image"); var source = document.getElementById(image.getAttribute("data-id")); var index = parseInt(source.getAttribute("data-image-index")); var length = parseInt(source.getAttribute("data-image-length")); var index = (index+delta) % length; if (index < 0) { index = length + index; } source.setAttribute("data-image-index", index); NetworKit_overlayUpdate(source); } function NetworKit_toggleDetails(source) { var childs = source.children; var show = false; if (source.getAttribute("data-title") == "-") { source.setAttribute("data-title", "+"); show = false; } else { source.setAttribute("data-title", "-"); show = true; } for (i=0; i<childs.length; i++) { if (show) { childs[i].style.display = "block"; } else { childs[i].style.display = "none"; } } }';
+        element.setAttribute('id', 'NetworKit_script');
+        document.head.appendChild(element);
+}
+
+
+{
+        var element = document.getElementById('NetworKit_style');
+        if (element) {
+                element.parentNode.removeChild(element);
+        }
+        element = document.createElement('style');
+        element.type = 'text/css';
+        element.innerHTML = '.NetworKit_Page { font-family: Arial, Helvetica, sans-serif; font-size: 14px; } .NetworKit_Page .Value:before { font-family: Arial, Helvetica, sans-serif; font-size: 1.05em; content: attr(data-title) ":"; margin-left: -2.5em; padding-right: 0.5em; } .NetworKit_Page .Details .Value:before { display: block; } .NetworKit_Page .Value { font-family: monospace; white-space: pre; padding-left: 2.5em; white-space: -moz-pre-wrap !important; white-space: -pre-wrap; white-space: -o-pre-wrap; white-space: pre-wrap; word-wrap: break-word; tab-size: 4; -moz-tab-size: 4; } .NetworKit_Page .Category { clear: both; padding-left: 1em; margin-bottom: 1.5em; } .NetworKit_Page .Category:before { content: attr(data-title); font-size: 1.75em; display: block; margin-left: -0.8em; margin-bottom: 0.5em; } .NetworKit_Page .SubCategory { margin-bottom: 1.5em; padding-left: 1em; } .NetworKit_Page .SubCategory:before { font-size: 1.6em; display: block; margin-left: -0.8em; margin-bottom: 0.5em; } .NetworKit_Page .SubCategory[data-title]:before { content: attr(data-title); } .NetworKit_Page .Block { display: block; } .NetworKit_Page .Block:after { content: "."; visibility: hidden; display: block; height: 0; clear: both; } .NetworKit_Page .Block .Thumbnail_Overview, .NetworKit_Page .Block .Thumbnail_ScatterPlot { width: 260px; float: left; } .NetworKit_Page .Block .Thumbnail_Overview img, .NetworKit_Page .Block .Thumbnail_ScatterPlot img { width: 260px; } .NetworKit_Page .Block .Thumbnail_Overview:before, .NetworKit_Page .Block .Thumbnail_ScatterPlot:before { display: block; text-align: center; font-weight: bold; } .NetworKit_Page .Block .Thumbnail_Overview:before { content: attr(data-title); } .NetworKit_Page .HeatCell { font-family: "Courier New", Courier, monospace; cursor: pointer; } .NetworKit_Page .HeatCell, .NetworKit_Page .HeatCellName { display: inline; padding: 0.1em; margin-right: 2px; background-color: #FFFFFF } .NetworKit_Page .HeatCellName { margin-left: 0.25em; } .NetworKit_Page .HeatCell:before { content: attr(data-heat); display: inline-block; color: #000000; width: 4em; text-align: center; } .NetworKit_Page .Measure { clear: both; } .NetworKit_Page .Measure .Details { cursor: pointer; } .NetworKit_Page .Measure .Details:before { content: "[" attr(data-title) "]"; display: block; } .NetworKit_Page .Measure .Details .Value { border-left: 1px dotted black; margin-left: 0.4em; padding-left: 3.5em; pointer-events: none; } .NetworKit_Page .Measure .Details .Spacer:before { content: "."; opacity: 0.0; pointer-events: none; } .NetworKit_Page .Measure .Plot { width: 440px; height: 440px; cursor: pointer; float: left; margin-left: -0.9em; margin-right: 20px; } .NetworKit_Page .Measure .Plot .Image { background-repeat: no-repeat; background-position: center center; background-size: contain; height: 100%; pointer-events: none; } .NetworKit_Page .Measure .Stat { width: 500px; float: left; } .NetworKit_Page .Measure .Stat .Group { padding-left: 1.25em; margin-bottom: 0.75em; } .NetworKit_Page .Measure .Stat .Group .Title { font-size: 1.1em; display: block; margin-bottom: 0.3em; margin-left: -0.75em; border-right-style: dotted; border-right-width: 1px; border-bottom-style: dotted; border-bottom-width: 1px; background-color: #D0D0D0; padding-left: 0.2em; } .NetworKit_Page .Measure .Stat .Group .List { -webkit-column-count: 3; -moz-column-count: 3; column-count: 3; } .NetworKit_Page .Measure .Stat .Group .List .Entry { position: relative; line-height: 1.75em; } .NetworKit_Page .Measure .Stat .Group .List .Entry[data-tooltip]:before { position: absolute; left: 0; top: -40px; background-color: #808080; color: #ffffff; height: 30px; line-height: 30px; border-radius: 5px; padding: 0 15px; content: attr(data-tooltip); white-space: nowrap; display: none; } .NetworKit_Page .Measure .Stat .Group .List .Entry[data-tooltip]:after { position: absolute; left: 15px; top: -10px; border-top: 7px solid #808080; border-left: 7px solid transparent; border-right: 7px solid transparent; content: ""; display: none; } .NetworKit_Page .Measure .Stat .Group .List .Entry[data-tooltip]:hover:after, .NetworKit_Page .Measure .Stat .Group .List .Entry[data-tooltip]:hover:before { display: block; } .NetworKit_Page .Measure .Stat .Group .List .Entry .MathValue { font-family: "Courier New", Courier, monospace; } .NetworKit_Page .Measure:after { content: "."; visibility: hidden; display: block; height: 0; clear: both; } .NetworKit_Page .PartitionPie { clear: both; } .NetworKit_Page .PartitionPie img { width: 600px; } #NetworKit_Overlay { left: 0px; top: 0px; display: none; position: absolute; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); z-index: 1000; } #NetworKit_Overlay_Title { position: absolute; color: white; transform: rotate(-90deg); width: 32em; height: 32em; padding-right: 0.5em; padding-top: 0.5em; text-align: right; font-size: 40px; } #NetworKit_Overlay .button { background: white; cursor: pointer; } #NetworKit_Overlay .button:before { size: 13px; display: inline-block; text-align: center; margin-top: 0.5em; margin-bottom: 0.5em; width: 1.5em; height: 1.5em; } #NetworKit_Overlay .icon-close:before { content: "X"; } #NetworKit_Overlay .icon-previous:before { content: "P"; } #NetworKit_Overlay .icon-next:before { content: "N"; } #NetworKit_Overlay .icon-save:before { content: "S"; } #NetworKit_Overlay_Toolbar_Top, #NetworKit_Overlay_Toolbar_Bottom { position: absolute; width: 40px; right: 13px; text-align: right; z-index: 1100; } #NetworKit_Overlay_Toolbar_Top { top: 0.5em; } #NetworKit_Overlay_Toolbar_Bottom { Bottom: 0.5em; } #NetworKit_Overlay_ImageContainer { position: absolute; top: 5%; left: 5%; height: 90%; width: 90%; background-repeat: no-repeat; background-position: center center; background-size: contain; } #NetworKit_Overlay_Image { height: 100%; width: 100%; background-repeat: no-repeat; background-position: center center; background-size: contain; }';
+        element.setAttribute('id', 'NetworKit_style');
+        document.head.appendChild(element);
+}
+
+
+{
+        var element = document.getElementById('NetworKit_Overlay');
+        if (element) {
+                element.parentNode.removeChild(element);
+        }
+        element = document.createElement('div');
+        element.innerHTML = '<div id="NetworKit_Overlay_Toolbar_Top"><div class="button icon-close" id="NetworKit_Overlay_Close" /></div><div id="NetworKit_Overlay_Title" /> <div id="NetworKit_Overlay_ImageContainer"> <div id="NetworKit_Overlay_Image" /> </div> <div id="NetworKit_Overlay_Toolbar_Bottom"> <div class="button icon-previous" onclick="NetworKit_overlayImageShift(-1)" /> <div class="button icon-next" onclick="NetworKit_overlayImageShift(1)" /> <a id="NetworKit_Overlay_Toolbar_Bottom_Save"><div class="button icon-save" /></a> </div>';
+        element.setAttribute('id', 'NetworKit_Overlay');
+        document.body.appendChild(element);
+        document.getElementById('NetworKit_Overlay_Close').onclick = function (e) {
+                document.getElementById('NetworKit_Overlay').style.display = 'none';
+        }
+}
+
+-->
+</script></div>
+</div>
+</section>
+<section id="Создание-модели">
+<h1>Создание модели<a class="headerlink" href="#Создание-модели" title="Permalink to this heading"></a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[35]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">territories</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s1">&#39;data/territories/shlis.geojson&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">to_crs</span><span class="p">(</span><span class="n">graph_crs</span><span class="p">)</span>
+<span class="n">territories</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[36]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">popframe.models.region</span> <span class="kn">import</span> <span class="n">Region</span>
+
+<span class="n">region</span> <span class="o">=</span> <span class="n">Region</span><span class="p">(</span>
+  <span class="n">towns</span><span class="o">=</span><span class="n">towns</span><span class="p">,</span>
+  <span class="n">settlements</span><span class="o">=</span><span class="n">okrugs</span><span class="p">,</span>
+  <span class="n">districts</span><span class="o">=</span><span class="n">rayons</span><span class="p">,</span>
+  <span class="n">accessibility_matrix</span><span class="o">=</span><span class="n">adj_mx</span><span class="p">,</span>
+  <span class="n">territories</span><span class="o">=</span><span class="n">territories</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[37]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">region</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/examples_blocks_generator_8_0.png" src="../_images/examples_blocks_generator_8_0.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">region</span><span class="o">.</span><span class="n">get_towns_gdf</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>id</th>
+      <th>name</th>
+      <th>population</th>
+      <th>level</th>
+      <th>geometry</th>
+      <th>settlement_name</th>
+      <th>district_name</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>0</td>
+      <td>Болото</td>
+      <td>111</td>
+      <td>Малое сельское поселение</td>
+      <td>POINT (543142.339 6580637.744)</td>
+      <td>Борское сельское поселение</td>
+      <td>Бокситогорский муниципальный район</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>1</td>
+      <td>Большой Остров</td>
+      <td>116</td>
+      <td>Малое сельское поселение</td>
+      <td>POINT (544532.929 6593228.214)</td>
+      <td>Борское сельское поселение</td>
+      <td>Бокситогорский муниципальный район</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2</td>
+      <td>Бор</td>
+      <td>116</td>
+      <td>Малое сельское поселение</td>
+      <td>POINT (544895.402 6593052.876)</td>
+      <td>Борское сельское поселение</td>
+      <td>Бокситогорский муниципальный район</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>3</td>
+      <td>Бороватое</td>
+      <td>114</td>
+      <td>Малое сельское поселение</td>
+      <td>POINT (543993.111 6589582.121)</td>
+      <td>Борское сельское поселение</td>
+      <td>Бокситогорский муниципальный район</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>4</td>
+      <td>Бочево</td>
+      <td>108</td>
+      <td>Малое сельское поселение</td>
+      <td>POINT (538540.110 6576793.684)</td>
+      <td>Борское сельское поселение</td>
+      <td>Бокситогорский муниципальный район</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>2926</th>
+      <td>2926</td>
+      <td>Апраксин Бор</td>
+      <td>96</td>
+      <td>Малое сельское поселение</td>
+      <td>POINT (399059.742 6560341.471)</td>
+      <td>Трубникоборское сельское поселение</td>
+      <td>Тоснненский муниципальный район</td>
+    </tr>
+    <tr>
+      <th>2927</th>
+      <td>2927</td>
+      <td>Александровка</td>
+      <td>98</td>
+      <td>Малое сельское поселение</td>
+      <td>POINT (403967.171 6562087.081)</td>
+      <td>Трубникоборское сельское поселение</td>
+      <td>Тоснненский муниципальный район</td>
+    </tr>
+    <tr>
+      <th>2928</th>
+      <td>2928</td>
+      <td>Большая Горка</td>
+      <td>100</td>
+      <td>Малое сельское поселение</td>
+      <td>POINT (413116.740 6573793.279)</td>
+      <td>Трубникоборское сельское поселение</td>
+      <td>Тоснненский муниципальный район</td>
+    </tr>
+    <tr>
+      <th>2929</th>
+      <td>2929</td>
+      <td>Дроздово</td>
+      <td>101</td>
+      <td>Малое сельское поселение</td>
+      <td>POINT (412458.032 6574811.307)</td>
+      <td>Трубникоборское сельское поселение</td>
+      <td>Тоснненский муниципальный район</td>
+    </tr>
+    <tr>
+      <th>2930</th>
+      <td>2930</td>
+      <td>Большая Кунесть</td>
+      <td>101</td>
+      <td>Малое сельское поселение</td>
+      <td>POINT (412158.909 6574630.200)</td>
+      <td>Трубникоборское сельское поселение</td>
+      <td>Тоснненский муниципальный район</td>
+    </tr>
+  </tbody>
+</table>
+<p>2931 rows × 7 columns</p>
+</div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[38]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># region.to_pickle(&#39;Ленинградская область3.pickle&#39;)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Работа-с-моделью---Создание-каркаса">
+<h1>Работа с моделью - Создание каркаса<a class="headerlink" href="#Работа-с-моделью---Создание-каркаса" title="Permalink to this heading"></a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">popframe.method.popuation_frame</span> <span class="kn">import</span> <span class="n">PopFrame</span>
+<span class="kn">from</span> <span class="nn">popframe.models.region</span> <span class="kn">import</span> <span class="n">Region</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[29]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Создание экземпляра GraphMethod с данными</span>
+<span class="n">region_model</span> <span class="o">=</span> <span class="n">Region</span><span class="o">.</span><span class="n">from_pickle</span><span class="p">(</span><span class="s1">&#39;/Users/mvin/Code/PopFrame/examples/data/data_models/Ленинградская область.pickle&#39;</span><span class="p">)</span>
+<span class="n">frame_method</span> <span class="o">=</span> <span class="n">PopFrame</span><span class="p">(</span><span class="n">region</span><span class="o">=</span><span class="n">region_model</span><span class="p">)</span>
+
+<span class="c1"># Получение графа</span>
+<span class="n">G</span> <span class="o">=</span> <span class="n">frame_method</span><span class="o">.</span><span class="n">build_network_frame</span><span class="p">()</span>
+<br/></pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[30]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">num_edges</span> <span class="o">=</span> <span class="n">G</span><span class="o">.</span><span class="n">number_of_edges</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Количество рёбер в графе:&quot;</span><span class="p">,</span> <span class="n">num_edges</span><span class="p">)</span>
+<br/></pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Количество рёбер в графе: 2930
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># G.nodes(data=True)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># G.edges(data=True)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">gdf_frame</span> <span class="o">=</span> <span class="n">frame_method</span><span class="o">.</span><span class="n">save_graph_to_geojson</span><span class="p">(</span><span class="n">G</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="n">gdf_frame</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>geometry</th>
+      <th>name</th>
+      <th>level</th>
+      <th>population</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>POINT (33.75892 59.36227)</td>
+      <td>Болото</td>
+      <td>Малое сельское поселение</td>
+      <td>111.0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>POINT (33.78600 59.47518)</td>
+      <td>Большой Остров</td>
+      <td>Малое сельское поселение</td>
+      <td>116.0</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>POINT (33.79236 59.47356)</td>
+      <td>Бор</td>
+      <td>Малое сельское поселение</td>
+      <td>116.0</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>POINT (33.77572 59.44249)</td>
+      <td>Бороватое</td>
+      <td>Малое сельское поселение</td>
+      <td>114.0</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>POINT (33.67728 59.32820)</td>
+      <td>Бочево</td>
+      <td>Малое сельское поселение</td>
+      <td>108.0</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>5856</th>
+      <td>LINESTRING (30.60534 59.49722, 30.58271 59.48439)</td>
+      <td>NaN</td>
+      <td>Малое сельское поселение</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>5857</th>
+      <td>LINESTRING (30.52914 59.66430, 30.54176 59.63431)</td>
+      <td>NaN</td>
+      <td>Среднее сельское поселение</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>5858</th>
+      <td>LINESTRING (30.52914 59.66430, 30.50370 59.63608)</td>
+      <td>NaN</td>
+      <td>Среднее сельское поселение</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>5859</th>
+      <td>LINESTRING (30.52914 59.66430, 30.50283 59.68264)</td>
+      <td>NaN</td>
+      <td>Среднее сельское поселение</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>5860</th>
+      <td>LINESTRING (30.52914 59.66430, 30.54457 59.69124)</td>
+      <td>NaN</td>
+      <td>Крупное сельское поселение</td>
+      <td>NaN</td>
+    </tr>
+  </tbody>
+</table>
+<p>5861 rows × 4 columns</p>
+</div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># gdf_frame = frame_method.save_graph_to_geojson(G, &#39;karkas_graph_Moscow_obl.geojson&#39;)</span>
+<span class="c1"># gdf_frame</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Graph successfully saved to karkas_graph_Moscow_obl.geojson with all node attributes.
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[31]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">frame_method</span><span class="o">.</span><span class="n">get_graph_html</span><span class="p">(</span><span class="n">G</span><span class="p">,</span> <span class="s1">&#39;final_graph_with_legend.html&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<section id="Кракас-населения---версия-2">
+<h2>Кракас населения - версия 2<a class="headerlink" href="#Кракас-населения---версия-2" title="Permalink to this heading"></a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">popframe.method.popuation_frame</span> <span class="kn">import</span> <span class="n">PopFrame</span>
+<span class="kn">from</span> <span class="nn">popframe.models.region</span> <span class="kn">import</span> <span class="n">Region</span>
+<span class="n">region_model</span> <span class="o">=</span> <span class="n">Region</span><span class="o">.</span><span class="n">from_pickle</span><span class="p">(</span><span class="s1">&#39;/Users/mvin/Code/PopFrame/examples/data/data_models/Москва.pickle&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">visualizer</span> <span class="o">=</span> <span class="n">PopFrame</span><span class="p">(</span><span class="n">region</span><span class="o">=</span><span class="n">region_model</span><span class="p">)</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">visualizer</span><span class="o">.</span><span class="n">build_circle_frame</span><span class="p">(</span><span class="n">output_type</span><span class="o">=</span><span class="s1">&#39;html&#39;</span><span class="p">)</span>  <span class="c1"># or &#39;gdf&#39;</span>
+<span class="n">output</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&#39;HTML map saved as final_circle.html&#39;
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">popframe.method.popuation_frame</span> <span class="kn">import</span> <span class="n">PopFrame</span>
+<span class="n">visualizer</span> <span class="o">=</span> <span class="n">PopFrame</span><span class="p">(</span><span class="n">region</span><span class="o">=</span><span class="n">region_model</span><span class="p">)</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">visualizer</span><span class="o">.</span><span class="n">build_circle_frame</span><span class="p">(</span><span class="n">output_type</span><span class="o">=</span><span class="s1">&#39;gdf&#39;</span><span class="p">)</span>  <span class="c1"># or &#39;gdf&#39;</span>
+<span class="n">output</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>id</th>
+      <th>name</th>
+      <th>population</th>
+      <th>level</th>
+      <th>geometry</th>
+      <th>settlement_name</th>
+      <th>district_name</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>0</td>
+      <td>Серебряные Пруды</td>
+      <td>9358</td>
+      <td>Малый город</td>
+      <td>POLYGON ((38.73204 54.46798, 38.73199 54.46703...</td>
+      <td>Московская область</td>
+      <td>Серебряные Пруды</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>1</td>
+      <td>Узуново</td>
+      <td>3417</td>
+      <td>Крупное сельское поселение</td>
+      <td>POLYGON ((38.62418 54.54061, 38.62415 54.54004...</td>
+      <td>Московская область</td>
+      <td>Серебряные Пруды</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2</td>
+      <td>Благодать</td>
+      <td>52</td>
+      <td>Малое сельское поселение</td>
+      <td>POLYGON ((38.63076 54.47175, 38.63075 54.47161...</td>
+      <td>Московская область</td>
+      <td>Серебряные Пруды</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>3</td>
+      <td>Ступино</td>
+      <td>66463</td>
+      <td>Средний город</td>
+      <td>POLYGON ((38.10304 54.88660, 38.10292 54.88407...</td>
+      <td>Московская область</td>
+      <td>Ступино</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>4</td>
+      <td>Кашира</td>
+      <td>39929</td>
+      <td>Малый город</td>
+      <td>POLYGON ((38.17049 54.83745, 38.17040 54.83549...</td>
+      <td>Московская область</td>
+      <td>Кашира</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>2860</th>
+      <td>2860</td>
+      <td>Шелгуново</td>
+      <td>9</td>
+      <td>Малое сельское поселение</td>
+      <td>POLYGON ((35.60876 56.37178, 35.60876 56.37173...</td>
+      <td>Московская область</td>
+      <td>Лотошино</td>
+    </tr>
+    <tr>
+      <th>2861</th>
+      <td>2861</td>
+      <td>Мазлово</td>
+      <td>2</td>
+      <td>Малое сельское поселение</td>
+      <td>POLYGON ((35.68795 56.36313, 35.68794 56.36310...</td>
+      <td>Московская область</td>
+      <td>Лотошино</td>
+    </tr>
+    <tr>
+      <th>2862</th>
+      <td>2862</td>
+      <td>Себудово</td>
+      <td>2</td>
+      <td>Малое сельское поселение</td>
+      <td>POLYGON ((35.52223 56.37250, 35.52223 56.37247...</td>
+      <td>Московская область</td>
+      <td>Лотошино</td>
+    </tr>
+    <tr>
+      <th>2863</th>
+      <td>2863</td>
+      <td>Введенское</td>
+      <td>694</td>
+      <td>Среднее сельское поселение</td>
+      <td>POLYGON ((35.64112 56.37377, 35.64109 56.37325...</td>
+      <td>Московская область</td>
+      <td>Лотошино</td>
+    </tr>
+    <tr>
+      <th>2864</th>
+      <td>2864</td>
+      <td>Новолотошино</td>
+      <td>1067</td>
+      <td>Большое сельское поселение</td>
+      <td>POLYGON ((35.65710 56.24687, 35.65707 56.24623...</td>
+      <td>Московская область</td>
+      <td>Лотошино</td>
+    </tr>
+  </tbody>
+</table>
+<p>2865 rows × 7 columns</p>
+</div></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Examples" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="methods/index.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024-2024, IDU.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
