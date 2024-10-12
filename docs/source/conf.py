@@ -20,8 +20,8 @@ from sphinx.builders.html import StandaloneHTMLBuilder
 
 # -- Project information -----------------------------------------------------
 
-project = "TownsNet"
-copyright = "2023-{}, IDU".format(datetime.datetime.now().year)
+project = "PopFrame"
+copyright = "2024-{}, IDU".format(datetime.datetime.now().year)
 author = "IDU"
 
 # The full version, including alpha/beta/rc tags
@@ -46,6 +46,7 @@ extensions = [
     "nbsphinx_link",
 ]
 
+autosummary_generate = True
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 

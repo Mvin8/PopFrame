@@ -32,7 +32,7 @@ data
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
-
+Karkas_ready
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -50,11 +50,9 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
-
 # Translations
 *.mo
 *.pot
-
 # Django stuff:
 *.log
 local_settings.py
@@ -105,6 +103,7 @@ celerybeat.pid
 .env
 .venv
 env/
+csv
 venv/
 ENV/
 env.bak/
@@ -134,16 +133,21 @@ dmypy.json
 /mp_data
 
 # data
-# *.pickle
-# *.parquet
-# *.geojson
+*.pickle
+*.parquet
+*.geojson
 *.pkl
+*.sld
+*.html
 *.graphml
 *.csv
-/townsnet/output_data
-
+/popframe/output_data
+9 регионов
+data_9
 cache/
 /examples/data
-
+city_frames_24_05
+urban
+test_methods
 # PyCharm env
 .idea
