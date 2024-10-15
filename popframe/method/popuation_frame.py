@@ -22,45 +22,32 @@ class PopulationFrame(BaseMethod):
                 idx, 
                 pos=(row.geometry.x, row.geometry.y), 
                 level=row['level'], 
-                name=row['name']
+                name=row['name'],
+                population=row['population']
             )
         return G
 
     def _connect_levels(self, towns: gpd.GeoDataFrame, G: nx.Graph, from_level: str, to_levels: List[str]):
-        """Connects nodes across specified levels"""
+        """Connects nodes across specified levels using time from accessibility_matrix"""
         from_towns = towns[towns['level'] == from_level].index
         to_towns = towns[towns['level'].isin(to_levels)].index
 
         if to_towns.empty:
             return
 
-        unconnected_from_towns = set(from_towns)
-
         for idx in from_towns:
-            distances = self.region.accessibility_matrix.loc[idx, to_towns]
-            if distances.empty:
+            times = self.region.accessibility_matrix.loc[idx, to_towns]  # Используем время из матрицы
+            if times.empty:
                 continue
-            nearest_idx = distances.idxmin()
+            nearest_idx = times.idxmin()  # Находим ближайший по времени город
+            min_time = times.min()  # Находим минимальное время
 
             if nearest_idx and not G.has_edge(idx, nearest_idx):
-                G.add_edge(idx, nearest_idx, level=from_level)
-                if idx in unconnected_from_towns:
-                    unconnected_from_towns.remove(idx)
-
-        # Connect remaining unconnected nodes using Euclidean distance
-        if unconnected_from_towns:
-            to_coords = towns.loc[to_towns].geometry.apply(lambda geom: (geom.x, geom.y)).tolist()
-            for idx in unconnected_from_towns:
-                from_coord = (towns.loc[idx].geometry.x, towns.loc[idx].geometry.y)
-                nearest_idx = min(to_towns, key=lambda to_idx: self._euclidean_distance(from_coord, (towns.loc[to_idx].geometry.x, towns.loc[to_idx].geometry.y)))
-                G.add_edge(idx, nearest_idx, level=from_level)
-
-    def _euclidean_distance(self, coord1, coord2):
-        """Calculates Euclidean distance between two coordinates"""
-        return ((coord1[0] - coord2[0]) ** 2 + (coord1[1] - coord2[1]) ** 2) ** 0.5
+                # Добавляем ребро с атрибутом времени
+                G.add_edge(idx, nearest_idx, level=from_level, time=min_time)
 
     def _connect_same_level(self, towns: gpd.GeoDataFrame, G: nx.Graph, level: str):
-        """Connects nodes within the same level using Kruskal's algorithm"""
+        """Connects nodes within the same level using Kruskal's algorithm with time from accessibility_matrix"""
         level_idxs = towns[towns['level'] == level].index
 
         if len(level_idxs) > 1:
@@ -72,12 +59,13 @@ class PopulationFrame(BaseMethod):
             for idx1 in level_idxs:
                 for idx2 in level_idxs:
                     if idx1 != idx2:
-                        distance = self.region.accessibility_matrix.at[idx1, idx2]
-                        H.add_edge(idx1, idx2, weight=distance)
+                        time = self.region.accessibility_matrix.at[idx1, idx2]  # Используем время из матрицы
+                        H.add_edge(idx1, idx2, weight=time)
 
             mst = nx.minimum_spanning_tree(H)
             for edge in mst.edges(data=True):
-                G.add_edge(edge[0], edge[1], level=level)
+                # Добавляем ребро с атрибутом времени
+                G.add_edge(edge[0], edge[1], level=level, time=edge[2]['weight'])
 
     def build_network_frame(self) -> nx.Graph:
         towns = self.region.get_towns_gdf().to_crs(4326)
@@ -105,6 +93,7 @@ class PopulationFrame(BaseMethod):
         self._connect_same_level(towns, G, highest_level)
 
         return G
+
 
 
     def get_color_map(self, levels):
