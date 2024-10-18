@@ -94,8 +94,6 @@ class PopulationFrame(BaseMethod):
 
         return G
 
-
-
     def get_color_map(self, levels):
         # Define the base colors for the heatmap starting from yellow to red
         base_colors = ['#FFC100', '#FF6500', '#C40C0C', '#6C0345']
@@ -236,7 +234,7 @@ class PopulationFrame(BaseMethod):
 
     def size_from_population(self, population, level):
         if level in ["Малое сельское поселение", "Среднее сельское поселение", "Большое сельское поселение"]:
-            return 0.0002 * (population ** 0.5)   # Логарифмическая шкала для малых населенных пунктов
+            return 0.0001 * (population ** 0.5)   # Логарифмическая шкала для малых населенных пунктов
         elif level == "Сверхкрупный город":
             return 0.00006 * (population ** 0.5)  # Уменьшенная линейная шкала для сверхкрупных городов
         return 0.0001 * (population ** 0.5)  # Линейная шкала для крупных населенных пунктов
@@ -295,14 +293,13 @@ class PopulationFrame(BaseMethod):
         return m
 
     def build_circle_frame(self, output_type='html'):
-        towns = self.region.get_towns_gdf().to_crs(3857)
+        towns = self.region.get_towns_gdf()
         if output_type == 'html':
             m = self.generate_map(towns)
             m.save('final_circle.html')
             return 'HTML map saved as final_circle.html'
         elif output_type == 'gdf':
             gdf = self.convert_points_to_circles(towns)
-            gdf.to_file("gdf_circle.geojson", driver="GeoJSON")
             return gdf
         else:
             raise ValueError("Unsupported output type. Choose either 'html' or 'gdf'.")
