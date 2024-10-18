@@ -1,11 +1,6 @@
 from .base_method import BaseMethod
-import networkx as nx
-from enum import Enum
-import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point, Polygon, MultiPolygon
-
-
 
 RADIUS = 500
 MIN_POPULATION = 15000
@@ -158,6 +153,62 @@ class AgglomerationBuilder(BaseMethod):
             lambda geom: max(geom.geoms, key=lambda g: g.area) if isinstance(geom, MultiPolygon) else geom
         )
         return gdf
+    
+    def evaluate_city_agglomeration_status(self, towns, agglomeration_gdf):
+        """
+        Evaluates cities according to their position in the agglomeration.
+                
+        Adds the 'agglomeration_status' attribute to towns with possible values:
+        - 'Outside the agglomeration'
+        - 'In the agglomeration of a larger city'
+        - 'Agglomeration Center'
+        
+        Parameters:
+        - - towns: Getdataframe with cities.
+        - - agglomeration_gdf: Geo Data Frame with agglomerations.
+        
+        Returns:
+        - - towns: Updated Getdataframe with added 'agglomeration_status' attribute.
+        """
+        agglomeration_status = []
+
+        for idx, town in towns.iterrows():
+            town_point = town['geometry']
+            town_name = town['name']
+            town_population = town['population']
+
+            in_agglomeration = False
+            in_larger_agglomeration = False
+            is_core_city = False
+
+            for agg_idx, agg in agglomeration_gdf.iterrows():
+                if town_point.intersects(agg['geometry']):
+                    in_agglomeration = True
+
+                    # Проверяем, является ли город основным в агломерации
+                    core_cities = agg['core_cities'].split(', ')
+                    if town_name in core_cities:
+                        is_core_city = True
+                        break
+
+                    # Проверяем, есть ли в агломерации города более крупного уровня
+                    for core_city in core_cities:
+                        core_city_pop = towns[towns['name'] == core_city]['population'].values[0]
+                        if core_city_pop > town_population:
+                            in_larger_agglomeration = True
+                            break
+
+            if is_core_city:
+                agglomeration_status.append('Центр агломерации')
+            elif not in_agglomeration:
+                agglomeration_status.append('Вне агломерации')
+            elif in_larger_agglomeration:
+                agglomeration_status.append('В агломерации более крупного города')
+            else:
+                agglomeration_status.append('В агломерации')
+
+        towns['agglomeration_status'] = agglomeration_status
+        return towns
 
     def get_agglomerations(self):
         """

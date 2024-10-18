@@ -5,7 +5,6 @@ import geopandas as gpd
 import folium
 import json
 from ..models.region import Town
-import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from shapely.geometry import Point, Polygon
 
