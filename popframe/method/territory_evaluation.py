@@ -14,85 +14,7 @@ from .base_method import BaseMethod
 
 class TerritoryEvaluation(BaseMethod):
 
-    @classmethod
-    def _is_criterion_satisfied(cls, profile_value, criterion_value):
-        if isinstance(profile_value, tuple):
-            return profile_value[0] <= criterion_value <= profile_value[1]
-        return criterion_value >= profile_value
-
-    @classmethod
-    def _calculate_exceedance(cls, profile_value, criterion_value):
-        if isinstance(profile_value, tuple):
-            if profile_value[0] <= criterion_value <= profile_value[1]:
-                return criterion_value - profile_value[0]
-            return 0
-        return max(0, criterion_value - profile_value)
-
-    def calculate_potential(self, criteria_values):
-        profiles = {
-            "Жилая застройка - ИЖС": {
-                "criteria": {"Население": 1, "Транспорт": 2, "Экология": 4, "Соц-об": 4, "Инж инф": 3},
-                "weights": {"Население": 0, "Транспорт": 0, "Экология": 1, "Соц-об": 1, "Инж инф": 0}
-            },
-            "Жилая застройка - Малоэтажная": {
-                "criteria": {"Население": 3, "Транспорт": 3, "Экология": 4, "Соц-об": 3, "Инж инф": 4},
-                "weights": {"Население": 1, "Транспорт": 1, "Экология": 1, "Соц-об": 1, "Инж инф": 1}
-            },
-            "Жилая застройка - Среднеэтажная": {
-                "criteria": {"Население": 4, "Транспорт": 4, "Экология": 4, "Соц-об": 3, "Инж инф": 5},
-                "weights": {"Население": 1, "Транспорт": 1, "Экология": 1, "Соц-об": 1, "Инж инф": 1}
-            },
-            "Жилая застройка - Многоэтажная": {
-                "criteria": {"Население": 5, "Транспорт": 5, "Экология": 4, "Соц-об": 3, "Инж инф": 5},
-                "weights": {"Население": 1, "Транспорт": 1, "Экология": 1, "Соц-об": 1, "Инж инф": 1}
-            },
-            "Общественно-деловая": {
-                "criteria": {"Население": 4, "Транспорт": 5, "Экология": 4, "Соц-об": 2, "Инж инф": 4},
-                "weights": {"Население": 1, "Транспорт": 1, "Экология": 1, "Соц-об": 0, "Инж инф": 1}
-            },
-            "Рекреационная": {
-                "criteria": {"Население": 0, "Транспорт": 0, "Экология": 4, "Соц-об": 0, "Инж инф": 0},
-                "weights": {"Население": 0, "Транспорт": 0, "Экология": 0, "Соц-об": 0, "Инж инф": 0}
-            },
-            "Специального назначения": {
-                "criteria": {"Население": 0, "Транспорт": 3, "Экология": 1, "Соц-об": 0, "Инж инф": 2},
-                "weights": {"Население": 1, "Транспорт": 1, "Экология": 1, "Соц-об": 0, "Инж инф": 1}
-            },
-            "Промышленная": {
-                "criteria": {"Население": 3, "Транспорт": 4, "Экология": 0, "Соц-об": 2, "Инж инф": 4},
-                "weights": {"Население": 1, "Транспорт": 1, "Экология": 0, "Соц-об": 0, "Инж инф": 1}
-            },
-            "Сельско-хозяйственная": {
-                "criteria": {"Население": 3, "Транспорт": 4, "Экология": 4, "Соц-об": 2, "Инж инф": 3},
-                "weights": {"Население": 1, "Транспорт": 1, "Экология": 1, "Соц-об": 0, "Инж инф": 1}
-            },
-            "Транспортная инженерная": {
-                "criteria": {"Население": 2, "Транспорт": 2, "Экология": 0, "Соц-об": 1, "Инж инф": 2},
-                "weights": {"Население": 0, "Транспорт": 0, "Экология": 0, "Соц-об": 0, "Инж инф": 0}
-            }
-        }
-
-        potential_scores = {}
-        for profile, data in profiles.items():
-            criteria = data["criteria"]
-            weights = data["weights"]
-            potential = sum(
-                self._is_criterion_satisfied(criteria.get(criterion, -1), value)
-                for criterion, value in criteria_values.items()
-            )
-            weighted_score = sum(
-                self._calculate_exceedance(criteria.get(criterion, -1), value) * weights.get(criterion, 1)
-                for criterion, value in criteria_values.items()
-            )
-            potential_scores[profile] = (potential, weighted_score)
-
-        ranked_profiles = sorted(potential_scores.items(), key=lambda x: (x[0] != "Рекреационная", x[1][0], x[1][1]), reverse=True)
-        ranked_profiles = [item for item in ranked_profiles if item[1][0] > 0] + [item for item in ranked_profiles if item[1][0] == 0]
-
-        return ranked_profiles
-
-
-    def evaluate_territory_location(self, territories):
+    def evaluate_territory_location(self, territories_gdf):
         """
         Main function to evaluate the location of a territory relative to settlements.
 
@@ -104,7 +26,6 @@ class TerritoryEvaluation(BaseMethod):
             list: A list of evaluation results for each territory.
         """
         settlements_gdf = self.region.get_towns_gdf()
-        territories_gdf = territories if territories is not None else self.region.get_territories_gdf()
 
         # Coordinate system transformation
         settlements_gdf = settlements_gdf.to_crs(epsg=3857)
@@ -249,7 +170,6 @@ class TerritoryEvaluation(BaseMethod):
         Returns:
             tuple: The pair of nearest settlements and the minimum distance.
         """
-        from itertools import combinations
 
         min_distance = float('inf')
         closest_settlement1 = None
@@ -270,7 +190,7 @@ class TerritoryEvaluation(BaseMethod):
 
         return closest_settlement1, closest_settlement2
        
-    def population_criterion(self, territories):
+    def population_criterion(self, territories_gdf):
         """
         Calculates population density and assesses territories based on demographic characteristics.
 
@@ -280,7 +200,7 @@ class TerritoryEvaluation(BaseMethod):
         Returns:
         list: A list of dictionaries containing the assessment results for each territory.
         """
-        gdf_territory = self._get_territories_gdf(territories)
+        gdf_territory = territories_gdf.to_crs(epsg=3857)
         towns_gdf = self.region.get_towns_gdf().to_crs(epsg=3857)
         results = self._calculate_density_population(gdf_territory, towns_gdf)
         
@@ -290,20 +210,6 @@ class TerritoryEvaluation(BaseMethod):
             result['interpretation'] = self._interpret_score(score)
 
         return results
-
-    def _get_territories_gdf(self, territories):
-        """
-        Gets the GeoDataFrame of territories, transformed to CRS 3857.
-
-        Parameters:
-        territories (GeoDataFrame or None): GeoDataFrame of territories or None to use default region territories.
-
-        Returns:
-        GeoDataFrame: The territories GeoDataFrame transformed to CRS 3857.
-        """
-        if territories is None:
-            return self.region.get_territories_gdf().to_crs(epsg=3857)
-        return territories.to_crs(epsg=3857)
 
     def _calculate_density_population(self, gdf_territory, towns_gdf, radius_m=20000):
         """
