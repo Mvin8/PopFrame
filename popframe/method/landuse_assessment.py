@@ -1,27 +1,24 @@
-from typing import List
+
 import osmnx as ox
+import sys
 import geopandas as gpd
 from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
 from shapely.ops import unary_union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from retrying import retry
 import pandas as pd
-import json
-from io import StringIO
 import matplotlib.pyplot as plt
 import contextily as ctx
 from matplotlib.lines import Line2D
-from ..models.region import Town
 from .base_method import BaseMethod
 import math
+from tqdm import tqdm
 
-
-class UrbanisationLevel(BaseMethod):
+class LandUseAssessment(BaseMethod):
 
     @retry(stop_max_attempt_number=5, wait_fixed=2000)
     def fetch_osm_data(self, polygon, tags):
         return ox.features_from_polygon(polygon, tags=tags)
-
 
     def get_landuse_data(self, territories):
         territories_gdf = territories
@@ -32,11 +29,11 @@ class UrbanisationLevel(BaseMethod):
             '1.3.1 Процент застройки жилищным строительством': ['residential', 'apartments', 'detached', 'construction'],
             '1.3.2 Процент земель сельскохозяйственного назначения': ['farmland', 'farmyard', 'orchard', 'vineyard', 'greenhouse_horticulture', 'meadow', 'plant_nursery', 'aquaculture', 'animal_keeping', 'breeding', 'grassland'],
             '1.3.3 Процент земель промышленного назначения': ['industrial', 'quarry', 'landfill'],
-            '1.3.4 Процент земель, занимаемыми лесными массивами': ['forest', 'wood'],
+            '1.3.4 Процент земель, занятых лесными массивами': ['forest', 'wood'],
             '1.3.5 Процент земель специального назначения': ['military', 'railway', 'cemetery', 'landfill', 'brownfield'],
             '1.3.6 Процент земель населенных пунктов': ['place_city', 'place_town'],
-            '1.3.7 Процент земель, занимаемых особо охраняемыми природными территориями': ['national_park', 'protected_area', 'nature_reserve', 'conservation'],
-            '1.3.8 Процент земель, занимаемых водным фондом': ['basin', 'reservoir', 'water', 'salt_pond']
+            '1.3.7 Процент земель, занятых особо охраняемыми природными территориями': ['national_park', 'protected_area', 'nature_reserve', 'conservation'],
+            '1.3.8 Процент земель, занятых водным фондом': ['basin', 'reservoir', 'water', 'salt_pond']
         }
 
         unique_tags = set(tag for tags in landuse_tags.values() for tag in tags)
@@ -48,7 +45,7 @@ class UrbanisationLevel(BaseMethod):
             unique_gdfs = {}
             with ThreadPoolExecutor() as executor:
                 future_to_tag_filter = {executor.submit(self.fetch_osm_data, polygon, tag_filter): tag_filter for tag_filter in tag_filters}
-                for future in as_completed(future_to_tag_filter):
+                for future in tqdm(as_completed(future_to_tag_filter), total=len(tag_filters), desc="Processing landuse tags"):
                     tag_filter = future_to_tag_filter[future]
                     try:
                         gdf = future.result()
@@ -58,7 +55,7 @@ class UrbanisationLevel(BaseMethod):
                                 gdf.set_crs(epsg=4326, inplace=True)
                             unique_gdfs[frozenset(tag_filter.items())] = gdf
                     except Exception as e:
-                        print(f"Error fetching data for tag filter {tag_filter}: {e}")
+                        pass
 
             combined_geometries = []
             for category, tags in landuse_tags.items():
@@ -109,12 +106,9 @@ class UrbanisationLevel(BaseMethod):
         landuse_gdf = adjust_geometries('1.3.1 Процент застройки жилищным строительством', landuse_gdf[~landuse_gdf['indicator'].isin(['1.3.1 Процент застройки жилищным строительством'])], landuse_gdf)
         landuse_gdf = adjust_geometries('1.3.6 Процент земель населенных пунктов', landuse_gdf[~landuse_gdf['indicator'].isin(['1.3.6 Процент земель населенных пунктов'])], landuse_gdf)
 
-
-        # Calculate the area percentage
         region_area_km2 = territories_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area.sum() / 1e6
         landuse_gdf['urbanization'] = (landuse_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area / 1e6 / region_area_km2 * 100)
 
-        # Calculate the '1.3.9 Другие земли' indicator
         all_landuse_union = unary_union(landuse_gdf.geometry)
         total_polygon = unary_union(territories_gdf.geometry)
         other_landuse = total_polygon.difference(all_landuse_union)
@@ -124,31 +118,20 @@ class UrbanisationLevel(BaseMethod):
             other_landuse_gdf['urbanization'] = (other_landuse_gdf.to_crs(territories_gdf.estimate_utm_crs()).geometry.area / 1e6 / region_area_km2 * 100)
             landuse_gdf = pd.concat([landuse_gdf, other_landuse_gdf], ignore_index=True)
 
-        # Group by 'indicator' and union geometries to avoid duplicates
         grouped_landuse_gdf = landuse_gdf.groupby('indicator').agg({
             'geometry': lambda x: unary_union(x),
             'urbanization': 'sum'
         }).reset_index()
 
-        # Create results DataFrame
         results = []
-        total_value = 0
+        total_value = grouped_landuse_gdf['urbanization'].sum()
 
-        # Сначала собираем все значения
-        for index, row in grouped_landuse_gdf.iterrows():
-            total_value += row['urbanization']
+        normalization_factor = 100 / total_value if total_value > 100 else 1
 
-        # Проверяем, если сумма больше 100
-        if total_value > 100:
-            normalization_factor = 100 / total_value
-        else:
-            normalization_factor = 1
-
-        # Заполняем результаты с учетом нормализации
         for index, row in grouped_landuse_gdf.iterrows():
             key = row['indicator']
             value = row['urbanization'] * normalization_factor
-            rounded_value = math.floor(value * 1000) / 1000.0  # Округляем в меньшую сторону до трех знаков после запятой
+            rounded_value = math.floor(value * 1000) / 1000.0
             results.append({
                 '№ п/п': key.split(' ')[0],
                 'Название хранимое': ' '.join(key.split(' ')[1:]) if ' ' in key else key,
@@ -161,6 +144,7 @@ class UrbanisationLevel(BaseMethod):
         results_gdf = gpd.GeoDataFrame(results, crs='EPSG:4326')
 
         return results_gdf
+
 
     def plot_landuse(self, region_gdf, landuse_gdf):
         if region_gdf.crs is None:
@@ -189,11 +173,11 @@ class UrbanisationLevel(BaseMethod):
             'Процент застройки жилищным строительством': 'Застройка жилищным строительством',
             'Процент земель сельскохозяйственного назначения': 'Сельскохозяйственные земли',
             'Процент земель промышленного назначения': 'Промышленные земли',
-            'Процент земель, занимаемыми лесными массивами': 'Лесные массивы',
+            'Процент земель, занятых лесными массивами': 'Лесные массивы',
             'Процент земель специального назначения': 'Земли специального назначения',
             'Процент земель населенных пунктов': 'Земли населенных пунктов',
-            'Процент земель, занимаемых особо охраняемыми природными территориями': 'Особо охраняемые природные территории',
-            'Процент земель, занимаемых водным фондом': 'Водный фонд',
+            'Процент земель, занятых особо охраняемыми природными территориями': 'Особо охраняемые природные территории',
+            'Процент земель, занятых водным фондом': 'Водный фонд',
             'Территории смежного назначения': 'Территории смежного назначения'
         }
         
