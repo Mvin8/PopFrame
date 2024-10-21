@@ -239,16 +239,9 @@ class PopulationFrame(BaseMethod):
         return 0.0001 * (population ** 0.5)  # Линейная шкала для крупных населенных пунктов
 
     def convert_points_to_circles(self, gdf):
-        new_geometries = []
-        for idx, row in gdf.iterrows():
-            if isinstance(row['geometry'], Point):
-                size = self.size_from_population(row['population'], row['level'])
-                size_in_meters = size * 111320  # Преобразование градусов в метры (примерный коэффициент)
-                circle = self.create_circle(row['geometry'], size_in_meters)
-                new_geometries.append(circle)
-            else:
-                new_geometries.append(row['geometry'])
-        gdf['geometry'] = new_geometries
+        gdf['size'] = gdf.apply(lambda row: self.size_from_population(row['population'], row['level']), axis=1)
+        gdf['size_in_meters'] = gdf['size'] * 111320
+        gdf['geometry'] = gdf.apply(lambda row: self.create_circle(row['geometry'], row['size_in_meters']) if isinstance(row['geometry'], Point) else row['geometry'], axis=1)
         return gdf
 
     def _get_color_map(self, levels):
