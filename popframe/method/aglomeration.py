@@ -1,6 +1,8 @@
 from .base_method import BaseMethod
 import geopandas as gpd
 from shapely.geometry import Point, Polygon, MultiPolygon
+from popframe.preprocessing.level_filler import LevelFiller
+import pandas as pd
 
 RADIUS = 500
 MIN_POPULATION = 15000
@@ -108,14 +110,16 @@ class AgglomerationBuilder(BaseMethod):
         merged_geometries = []
         processed_indices = set()
 
+        # Основной цикл по агломерациям
         for i, row_i in gdf.iterrows():
             if i in processed_indices:
                 continue
-            
+
             overlapping_agglomerations = [row_i]
             geometry = row_i['geometry']
             merged_names = {row_i['name']}
 
+            # Первый цикл: проверка пересечений и объединение агломераций
             for j, row_j in gdf.iterrows():
                 if i != j and j not in processed_indices:
                     if geometry.intersects(row_j['geometry']):
@@ -123,6 +127,19 @@ class AgglomerationBuilder(BaseMethod):
                         geometry = geometry.union(row_j['geometry'])
                         merged_names.add(row_j['name'])
                         processed_indices.add(j)
+
+            # Второй цикл: дополнительная проверка для объединения с новыми полигонами
+            still_intersecting = True
+            while still_intersecting:
+                still_intersecting = False
+                for j, row_j in gdf.iterrows():
+                    if j not in processed_indices:
+                        if geometry.intersects(row_j['geometry']):
+                            overlapping_agglomerations.append(row_j)
+                            geometry = geometry.union(row_j['geometry'])
+                            merged_names.add(row_j['name'])
+                            processed_indices.add(j)
+                            still_intersecting = True
 
             towns_in_agglomeration = towns[towns.intersects(geometry)]
             population_from_towns = towns_in_agglomeration['population'].sum()
@@ -168,6 +185,14 @@ class AgglomerationBuilder(BaseMethod):
         )
         return gdf
     
+    # def _get_towns_gdf(self, update_df: pd.DataFrame | None = None):
+    #     gdf = self.region.get_towns_gdf()
+    #     if update_df is not None:
+    #         gdf["population"] = gdf["population"].add(update_df["population"].fillna(0), fill_value=0)
+    #         level_filler = LevelFiller(towns=gdf)
+    #         gdf = level_filler.fill_levels()
+    #     return gdf
+
     def evaluate_city_agglomeration_status(self, towns, agglomeration_gdf):
         """
         Evaluates cities according to their position in the agglomeration.
@@ -223,19 +248,16 @@ class AgglomerationBuilder(BaseMethod):
         return towns
 
 
-    def get_agglomerations(self):
+    def get_agglomerations(self, update_df: pd.DataFrame | None = None):
         """
         The main function that orchestrates the creation, merging, and finalization of agglomerations.
         
         Returns:
         - A GeoDataFrame with the finalized agglomerations, merged, simplified, and overlaid on region boundaries.
         """
-        towns = self.region.get_towns_gdf()
-        # Ensure that the towns GeoDataFrame has a geometry column set
-        if 'geometry' not in towns.columns:
-            raise ValueError("Towns GeoDataFrame must have a 'geometry' column with valid geometries.")
-        
-        towns = towns.set_geometry('geometry')
+        # towns = self._get_towns_gdf(update_df)
+        towns = self.region.get_update_towns_gdf(update_df)
+
         region_boundary = self.region.region
 
         # Step 1: Build agglomerations

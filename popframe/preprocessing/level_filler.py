@@ -20,7 +20,7 @@ class TownRow(BaseRow):
     level : str, optional
         The administrative level of the town, defaults to "Нет уровня" (no level).
     """
-
+    id: int
     geometry: Point
     name: str
     population: int = Field(gt=0)

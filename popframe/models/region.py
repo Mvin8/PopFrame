@@ -1,11 +1,11 @@
 from functools import singledispatchmethod
 import dill as pickle
 import pyproj
-import shapely
 import geopandas as gpd
 import pandas as pd
 from .town import Town
 import matplotlib.pyplot as plt
+from popframe.preprocessing.level_filler import LevelFiller
 
 
 DISTRICTS_PLOT_COLOR = '#28486d'
@@ -118,6 +118,14 @@ class Region():
             List of Town objects.
         """
         return self._towns.values()
+    
+    def get_update_towns_gdf(self, update_df: pd.DataFrame | None = None):
+        gdf = self.get_towns_gdf()
+        if update_df is not None:
+            gdf["population"] = gdf["population"].add(update_df["population"].fillna(0), fill_value=0)
+            level_filler = LevelFiller(towns=gdf)
+            gdf = level_filler.fill_levels()
+        return gdf
 
     def get_towns_gdf(self) -> gpd.GeoDataFrame:
         """
