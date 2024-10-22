@@ -102,6 +102,7 @@ class LevelFiller(BaseModel):
         GeoDataFrame[TownRow]
             A validated GeoDataFrame with assigned administrative levels.
         """
+        gdf["id"] = gdf.index
         gdf["level"] = gdf.apply(cls._assign_level, axis=1)
         return GeoDataFrame[TownRow](gdf)
 
@@ -114,7 +115,5 @@ class LevelFiller(BaseModel):
         GeoDataFrame[TownRow]
             An updated GeoDataFrame with filled levels for each town.
         """
-        towns = self.towns.copy()
-        towns["level"] = towns.apply(self._assign_level, axis=1)
-        return towns
+        return self.towns
 
