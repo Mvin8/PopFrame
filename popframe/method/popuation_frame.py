@@ -7,6 +7,7 @@ import json
 from ..models.region import Town
 import matplotlib.colors as mcolors
 from shapely.geometry import Point, Polygon
+import pandas as pd
 
 from .base_method import BaseMethod
 
@@ -29,7 +30,7 @@ class PopulationFrame(BaseMethod):
         gdf = gdf.drop(columns=['size', 'size_in_meters'])
         return gdf
 
-    def build_circle_frame(self):
-        towns = self.region.get_towns_gdf()
+    def build_circle_frame(self, update_df: pd.DataFrame | None = None):
+        towns = self.region.get_update_towns_gdf(update_df)
         gdf = self._convert_points_to_circles(towns)
         return gdf

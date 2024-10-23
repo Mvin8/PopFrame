@@ -122,10 +122,13 @@ class Region():
     def get_update_towns_gdf(self, update_df: pd.DataFrame | None = None):
         gdf = self.get_towns_gdf()
         if update_df is not None:
-            gdf["population"] = gdf["population"].add(update_df["population"].fillna(0), fill_value=0)
+            # Обновляем значения населения в gdf из update_df
+            gdf.update(update_df[['population']])
+            
             level_filler = LevelFiller(towns=gdf)
             gdf = level_filler.fill_levels()
         return gdf
+
 
     def get_towns_gdf(self) -> gpd.GeoDataFrame:
         """

@@ -3,6 +3,7 @@ import geopandas as gpd
 from shapely.geometry import Point, Polygon, MultiPolygon
 from popframe.preprocessing.level_filler import LevelFiller
 import pandas as pd
+from shapely.ops import unary_union
 
 RADIUS = 500
 MIN_POPULATION = 15000
@@ -42,7 +43,7 @@ class AgglomerationBuilder(BaseMethod):
                 if node in IN_AGGLOMERATION or population < MIN_POPULATION:
                     continue
 
-                agglomeration = self._get_agglomeration_around_node(node, max_time)
+                agglomeration = self._get_agglomeration_around_node(node, max_time, towns)
 
                 if agglomeration:
                     agglomeration["name"] = node_names.get(node)
@@ -62,7 +63,7 @@ class AgglomerationBuilder(BaseMethod):
 
         return agglomeration_gdf
 
-    def _get_agglomeration_around_node(self, start_node, max_time):
+    def _get_agglomeration_around_node(self, start_node, max_time, towns):
         """
         Finds the agglomeration around a given city node within the specified time limit using the accessibility matrix.
         
@@ -82,7 +83,7 @@ class AgglomerationBuilder(BaseMethod):
         if within_time_nodes.empty:
             return None
 
-        nodes_data = self.region.get_towns_gdf().set_index('id').loc[within_time_nodes]
+        nodes_data = towns.set_index('id').loc[within_time_nodes]
         nodes_data['geometry'] = nodes_data.apply(lambda row: Point(row['geometry'].x, row['geometry'].y), axis=1)
         nodes_gdf = gpd.GeoDataFrame(nodes_data, geometry='geometry', crs=self.region.crs)
 
@@ -124,7 +125,7 @@ class AgglomerationBuilder(BaseMethod):
                 if i != j and j not in processed_indices:
                     if geometry.intersects(row_j['geometry']):
                         overlapping_agglomerations.append(row_j)
-                        geometry = geometry.union(row_j['geometry'])
+                        geometry = unary_union([geometry, row_j['geometry']])  # Используем unary_union
                         merged_names.add(row_j['name'])
                         processed_indices.add(j)
 
@@ -136,10 +137,14 @@ class AgglomerationBuilder(BaseMethod):
                     if j not in processed_indices:
                         if geometry.intersects(row_j['geometry']):
                             overlapping_agglomerations.append(row_j)
-                            geometry = geometry.union(row_j['geometry'])
+                            geometry = unary_union([geometry, row_j['geometry']])  # Используем unary_union
                             merged_names.add(row_j['name'])
                             processed_indices.add(j)
                             still_intersecting = True
+
+            # Проверяем валидность геометрии и исправляем ее, если необходимо
+            if not geometry.is_valid:
+                geometry = geometry.buffer(0)
 
             towns_in_agglomeration = towns[towns.intersects(geometry)]
             population_from_towns = towns_in_agglomeration['population'].sum()
@@ -184,14 +189,7 @@ class AgglomerationBuilder(BaseMethod):
             lambda geom: max(geom.geoms, key=lambda g: g.area) if isinstance(geom, MultiPolygon) else geom
         )
         return gdf
-    
-    # def _get_towns_gdf(self, update_df: pd.DataFrame | None = None):
-    #     gdf = self.region.get_towns_gdf()
-    #     if update_df is not None:
-    #         gdf["population"] = gdf["population"].add(update_df["population"].fillna(0), fill_value=0)
-    #         level_filler = LevelFiller(towns=gdf)
-    #         gdf = level_filler.fill_levels()
-    #     return gdf
+
 
     def evaluate_city_agglomeration_status(self, towns, agglomeration_gdf):
         """
@@ -214,12 +212,10 @@ class AgglomerationBuilder(BaseMethod):
         for idx, town in towns.iterrows():
             town_point = town['geometry']
             town_name = town['name']
-            town_population = town['population']
-
+            
             in_agglomeration = False
             is_core_city = False
             current_agglomeration_level = 0  # Default level for towns outside agglomerations
-            current_status = 'Вне агломерации'  # Default status
 
             for agg_idx, agg in agglomeration_gdf.iterrows():
                 if town_point.intersects(agg['geometry']):
@@ -262,7 +258,8 @@ class AgglomerationBuilder(BaseMethod):
 
         # Step 1: Build agglomerations
         agglomeration_gdf = self._build_agglomeration(towns)
-
+                # Step 4: Simplify multipolygons
+        agglomeration_gdf = self._simplify_multipolygons(agglomeration_gdf)
         # Step 2: Merge intersecting agglomerations and update population data
         agglomeration_gdf = self._merge_intersecting_agglomerations(agglomeration_gdf, towns)
 
