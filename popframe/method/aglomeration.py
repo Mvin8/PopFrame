@@ -5,7 +5,7 @@ from popframe.preprocessing.level_filler import LevelFiller
 import pandas as pd
 from shapely.ops import unary_union
 
-RADIUS = 500
+RADIUS = 400
 MIN_POPULATION = 15000
 IN_AGGLOMERATION = {}
 
