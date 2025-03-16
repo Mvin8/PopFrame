@@ -4,7 +4,7 @@ from shapely.geometry import Point, Polygon, MultiPolygon
 import pandas as pd
 from shapely.ops import unary_union
 
-RADIUS = 170
+RADIUS = 250
 MAX_ANCHOR_TIME = 50
 
 class AnchorSettlementBuilder(BaseMethod):
@@ -48,7 +48,8 @@ class AnchorSettlementBuilder(BaseMethod):
         
         nodes_gdf = towns.set_index('id').loc[within_time_nodes]
         
-        distance = {node: max_time * RADIUS for node in within_time_nodes}
+        distance = {node: (max_time - distances_from_start[node]) * RADIUS for node in within_time_nodes}
+        # distance = {node: (max_time) * RADIUS for node in within_time_nodes}
         nodes_gdf["left_distance"] = nodes_gdf.index.map(distance)
         boundary_geom = nodes_gdf.buffer(nodes_gdf["left_distance"]).unary_union
         
@@ -57,12 +58,27 @@ class AnchorSettlementBuilder(BaseMethod):
             "nodes_in_boundary": list(within_time_nodes)
         }
     
-    def _simplify_multipolygons(self, gdf):
-        gdf['geometry'] = gdf['geometry'].apply(
-            lambda geom: max(geom.geoms, key=lambda g: g.area) if isinstance(geom, MultiPolygon) else geom
-        )
+    def _simplify_multipolygons(self, gdf, towns):
+        anchor_towns = towns[towns['is_anchor_settlement'] == True]
+        
+        def process_geometry(geom):
+            if isinstance(geom, MultiPolygon):
+                polygons = list(geom.geoms)
+                
+                # Фильтруем только те полигоны, которые пересекаются с anchor_towns
+                filtered_polygons = [p for p in polygons if any(p.intersects(at) for at in anchor_towns.geometry)]
+                
+                if filtered_polygons:
+                    return MultiPolygon(filtered_polygons) if len(filtered_polygons) > 1 else filtered_polygons[0]
+                else:
+                    return None  # Удаляем геометрию, если ни один полигон не пересекается
+            
+            return geom if any(geom.intersects(at) for at in anchor_towns.geometry) else None
+        
+        gdf['geometry'] = gdf['geometry'].apply(process_geometry)
+        gdf = gdf.dropna(subset=['geometry']).reset_index(drop=True)  # Удаляем строки без геометрии
         return gdf
-    
+                
     def _merge_intersecting_boundaries(self, gdf):
         merged_geometries = []
         processed_indices = set()
@@ -100,7 +116,7 @@ class AnchorSettlementBuilder(BaseMethod):
             merged_boundary = {
                 'geometry': geometry,
                 'type': 'Merged' if len(merged_names) > 1 else 'Single',
-                'core_settlements': ', '.join(merged_names)
+                'anchor_settlements': ', '.join(merged_names)
             }
             merged_geometries.append(merged_boundary)
             
@@ -125,14 +141,19 @@ class AnchorSettlementBuilder(BaseMethod):
         region_boundary = self.region.region
         
         boundary_gdf = self._build_anchor_settlement_boundaries(towns)
-        
-        # boundary_gdf = self._simplify_multipolygons(boundary_gdf)
+  
+        boundary_gdf = self._simplify_multipolygons(boundary_gdf, towns)
         
         boundary_gdf = self._merge_intersecting_boundaries(boundary_gdf)
+
+        boundary_gdf = boundary_gdf.explode(index_parts=False)
+
+        # Сбрасываем индекс (если необходимо)
+        boundary_gdf = boundary_gdf.reset_index(drop=True)
         
         boundary_gdf = gpd.overlay(boundary_gdf, region_boundary, how='intersection')
         
-        boundary_gdf = self._simplify_multipolygons(boundary_gdf)
+        boundary_gdf = self._simplify_multipolygons(boundary_gdf, towns)
         
         boundary_gdf['geometry'] = boundary_gdf['geometry'].apply(
             lambda geom: Polygon(geom.exterior) if geom.is_valid else geom
