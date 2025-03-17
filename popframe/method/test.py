@@ -4,7 +4,7 @@ from shapely.geometry import Point, Polygon, MultiPolygon
 import pandas as pd
 from shapely.ops import unary_union
 
-RADIUS = 250
+RADIUS = 260
 MAX_ANCHOR_TIME = 50
 
 class AnchorSettlementBuilder(BaseMethod):
