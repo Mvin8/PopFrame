@@ -334,6 +334,9 @@ class AnchorSettlementBuilder(BaseMethod):
             towns = self.region.get_update_towns_gdf(update_df)
         
         region_boundary = self.region.region
+
+        local_crs = self.region.region.crs
+        towns = towns.to_crs(local_crs)
         
         boundary_gdf = self._build_anchor_settlement_boundaries(towns)
   

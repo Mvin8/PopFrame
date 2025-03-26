@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 import branca.colormap as cm
 import json
+from .base_method import BaseMethod
 
 
 # Определение списка столбцов с оценками
@@ -20,7 +21,7 @@ SCORE_COLUMNS = [
 ]
 
 
-class SpatialInequalityCalculator():
+class SpatialInequalityCalculator(BaseMethod):
     def calculate_spatial_inequality(self, tows_info_gdf):
         
         spatial_inequality_gdf = tows_info_gdf.copy()
@@ -140,6 +141,10 @@ class SpatialInequalityCalculator():
         for col in SCORE_COLUMNS:
             polygon_spatial_inequality[col] = np.nan
 
+        local_crs = self.region.region.crs
+        spatial_inequality_gdf = spatial_inequality_gdf.to_crs(local_crs)
+        settlement_boundaries = settlement_boundaries.to_crs(local_crs)
+        
         # Проходим по каждому полигону в polygon_spatial_inequality
         for idx, poly in polygon_spatial_inequality.iterrows():
             poly_geom = poly.geometry
