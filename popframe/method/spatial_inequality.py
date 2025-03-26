@@ -8,7 +8,7 @@ import geopandas as gpd
 import pandas as pd
 import numpy as np
 import branca.colormap as cm
-
+import json
 
 
 # Определение списка столбцов с оценками
@@ -28,7 +28,12 @@ class SpatialInequalityCalculator():
         for col in SCORE_COLUMNS:
             spatial_inequality_gdf[col] = 1 - spatial_inequality_gdf[col]
 
-        return spatial_inequality_gdf.fillna(0)
+        # Шаг 1: Распределение оценок на города
+        spatial_inequality_gdf = self.distribute_scores_by_population(spatial_inequality_gdf)
+
+        spatial_inequality_gdf['spatial_inequality'] = spatial_inequality_gdf[SCORE_COLUMNS].mean(axis=1)
+
+        return spatial_inequality_gdf
 
     
 
@@ -117,29 +122,29 @@ class SpatialInequalityCalculator():
         return towns_result
 
 
-    def calculate_gpsp_spatial_inequality(self, towns_result, settlement_boundaries):
+    def calculate_polygon_spatial_inequality(self, spatial_inequality_gdf, settlement_boundaries):
         """
         Вычисляет средние оценки для полигонов на основе оценок городов внутри них.
         
         Параметры:
-        towns_result (GeoDataFrame): GeoDataFrame с городами и их оценками.
+        spatial_inequality_gdf (GeoDataFrame): GeoDataFrame с городами и их оценками.
         settlement_boundaries (GeoDataFrame): GeoDataFrame с полигонами для записи средних оценок.
 
         Возвращает:
         GeoDataFrame: Копия исходного GeoDataFrame с полигонами и средними оценками.
         """
         # Создаём копию result_gdf для записи новых оценок
-        settlement_boundaries_copy = settlement_boundaries.copy()
+        polygon_spatial_inequality = settlement_boundaries.copy()
 
-        # Добавляем в gpsp_spatial_inequality столбцы для оценок (инициализируем NaN)
+        # Добавляем в polygon_spatial_inequality столбцы для оценок (инициализируем NaN)
         for col in SCORE_COLUMNS:
-            settlement_boundaries_copy[col] = np.nan
+            polygon_spatial_inequality[col] = np.nan
 
-        # Проходим по каждому полигону в gpsp_spatial_inequality
-        for idx, poly in settlement_boundaries_copy.iterrows():
+        # Проходим по каждому полигону в polygon_spatial_inequality
+        for idx, poly in polygon_spatial_inequality.iterrows():
             poly_geom = poly.geometry
             # Отбираем города, которые полностью находятся внутри полигона
-            towns_in_poly = towns_result[towns_result.within(poly_geom)]
+            towns_in_poly = spatial_inequality_gdf[spatial_inequality_gdf.within(poly_geom)]
             
             # Если городов внутри полигона нет, переходим к следующему
             if towns_in_poly.empty:
@@ -148,30 +153,31 @@ class SpatialInequalityCalculator():
             # Для каждого оценочного столбца вычисляем среднее значение по городам внутри полигона
             for col in SCORE_COLUMNS:
                 mean_score = towns_in_poly[col].mean()
-                settlement_boundaries_copy.loc[idx, col] = mean_score
+                polygon_spatial_inequality.loc[idx, col] = mean_score
 
-        return settlement_boundaries_copy
+        
+        # Шаг 3: Анализ распределения городов внутри и вне полигонов
+        stats_json = self.analyze_town_distribution(spatial_inequality_gdf, polygon_spatial_inequality)
+
+        polygon_spatial_inequality['spatial_inequality'] = polygon_spatial_inequality[SCORE_COLUMNS].mean(axis=1)
+
+        return polygon_spatial_inequality, stats_json
 
 
-    def analyze_town_distribution(self, towns_result, gpsp_spatial_inequality):
+
+    def analyze_town_distribution(self, towns_result, polygon_spatial_inequality):
         """
         Анализирует распределение городов внутри и вне полигонов и вычисляет статистику по оценкам.
         
         Параметры:
         towns_result (GeoDataFrame): GeoDataFrame с городами и их оценками.
-        gpsp_spatial_inequality (GeoDataFrame): GeoDataFrame с полигонами и их оценками.
+        polygon_spatial_inequality (GeoDataFrame): GeoDataFrame с полигонами и их оценками.
 
         Возвращает:
-        tuple: (inside_towns, outside_towns, inside_stats, outside_stats) - GeoDataFrame городов внутри полигонов,
-            GeoDataFrame городов вне полигонов, и словари со статистикой по оценкам для обеих групп.
+        str: JSON-строка с двумя словарями статистики (inside_stats и outside_stats).
         """
-        # Преобразование: вычитаем оценки из 1 для gpsp_spatial_inequality и towns_result
-        for col in SCORE_COLUMNS:
-            gpsp_spatial_inequality[col] = gpsp_spatial_inequality[col].apply(lambda x: 1 - x if pd.notnull(x) else x)
-            towns_result[col] = towns_result[col].apply(lambda x: 1 - x if pd.notnull(x) else x)
-
         # Создаём булеву маску: для каждого города проверяем, пересекается ли его геометрия хотя бы с одним полигоном
-        inside_mask = towns_result.geometry.apply(lambda pt: gpsp_spatial_inequality.intersects(pt).any())
+        inside_mask = towns_result.geometry.apply(lambda pt: polygon_spatial_inequality.intersects(pt).any())
 
         # Разбиваем на две группы
         inside_towns = towns_result[inside_mask]
@@ -181,24 +187,30 @@ class SpatialInequalityCalculator():
         inside_stats = {}
         outside_stats = {}
         
-        for col in SCORE_COLUMNS:
+        for col in SCORE_COLUMNS+['spatial_inequality']:
             inside_stats[col] = inside_towns[col].mean()
             outside_stats[col] = outside_towns[col].mean()
         
-        return inside_towns, outside_towns, inside_stats, outside_stats
+        # Создаем общий словарь и преобразуем его в JSON
+        result = {
+            "inside_stats": inside_stats,
+            "outside_stats": outside_stats
+        }
+        
+        return result
 
-
-    def create_interactive_map(self, spatial_inequality_gdf, gpsp_spatial_inequality, towns_result, selected_attribute=None, color_by_average=True):
+    def create_interactive_map(self, spatial_inequality_gdf, polygon_spatial_inequality, selected_attribute=None, color_by_average=True, vmin=None, vmax=None):
         """
         Создает интерактивную карту с отображением полигонов и точек с возможностью выбора атрибута для отображения
-        или раскраски по среднему значению всех атрибутов.
+        или раскраски по колонке spatial_inequality.
         
         Параметры:
-        spatial_inequality_gdf (GeoDataFrame): GeoDataFrame с данными о неравенстве.
-        gpsp_spatial_inequality (GeoDataFrame): GeoDataFrame с полигонами регионов.
-        towns_result (GeoDataFrame): GeoDataFrame с городами.
-        selected_attribute (str, optional): Атрибут для раскраски объектов. Если None и color_by_average=True, используется среднее.
-        color_by_average (bool): Если True, раскрашивает полигоны по среднему всех атрибутов, иначе - по selected_attribute.
+        spatial_inequality_gdf (GeoDataFrame): GeoDataFrame с данными о неравенстве (города).
+        polygon_spatial_inequality (GeoDataFrame): GeoDataFrame с полигонами регионов.
+        selected_attribute (str, optional): Атрибут для раскраски объектов. Если None и color_by_average=True, используется 'spatial_inequality'.
+        color_by_average (bool): Если True, раскрашивает объекты по колонке 'spatial_inequality', иначе - по selected_attribute.
+        vmin (float, optional): Минимальное значение для цветовой шкалы. Если None, вычисляется автоматически.
+        vmax (float, optional): Максимальное значение для цветовой шкалы. Если None, вычисляется автоматически.
         
         Возвращает:
         folium.Map: Интерактивная карта с визуализацией данных.
@@ -206,21 +218,19 @@ class SpatialInequalityCalculator():
         # Убеждаемся, что все GeoDataFrame имеют систему координат EPSG:4326
         if spatial_inequality_gdf.crs != "EPSG:4326":
             spatial_inequality_gdf = spatial_inequality_gdf.to_crs(epsg=4326)
-        if gpsp_spatial_inequality.crs != "EPSG:4326":
-            gpsp_spatial_inequality = gpsp_spatial_inequality.to_crs(epsg=4326)
-        if towns_result.crs != "EPSG:4326":
-            towns_result = towns_result.to_crs(epsg=4326)
-        
+        if polygon_spatial_inequality.crs != "EPSG:4326":
+            polygon_spatial_inequality = polygon_spatial_inequality.to_crs(epsg=4326)
+
         # Создаем карту с центром на средних координатах
         m = folium.Map(location=[spatial_inequality_gdf.geometry.y.mean(), 
-                            spatial_inequality_gdf.geometry.x.mean()], 
-                    zoom_start=10)
+                                spatial_inequality_gdf.geometry.x.mean()], 
+                        zoom_start=10)
         
         # Список переменных
         columns = ["soc_workers_dev", "soc_workers_soc", "soc_workers_bas", 
                 "soc_old_dev", "soc_old_soc", "soc_old_bas", 
                 "soc_parents_dev", "soc_parents_soc", "soc_parents_bas",
-                'provision', 'basic', 'additional', 'comfort']
+                'provision', 'basic', 'additional', 'comfort', 'spatial_inequality']
         
         # Группировка колонок с изменением отображаемого имени для 'provision'
         groups = {
@@ -233,97 +243,46 @@ class SpatialInequalityCalculator():
         # Создаем группу для точек
         points_layer = folium.FeatureGroup(name="Cities")
         
-        # Находим минимальные и максимальные значения для всех атрибутов
-        all_values = []
-        for col in columns:
-            if col in gpsp_spatial_inequality.columns and col in towns_result.columns:
-                all_values.extend(gpsp_spatial_inequality[col].dropna().tolist())
-                all_values.extend(towns_result[col].dropna().tolist())
+        # Находим минимальные и максимальные значения, если vmin и vmax не заданы
+        if vmin is None or vmax is None:
+            if color_by_average:
+                # Используем значения из колонки 'spatial_inequality'
+                all_values = []
+                all_values.extend(spatial_inequality_gdf['spatial_inequality'].dropna().tolist())
+                all_values.extend(polygon_spatial_inequality['spatial_inequality'].dropna().tolist())
+            else:
+                # Используем все значения выбранного атрибута или всех атрибутов, если selected_attribute не указан
+                all_values = []
+                target_columns = [selected_attribute] if selected_attribute else columns
+                for col in target_columns:
+                    if col in polygon_spatial_inequality.columns and col in spatial_inequality_gdf.columns:
+                        all_values.extend(polygon_spatial_inequality[col].dropna().tolist())
+                        all_values.extend(spatial_inequality_gdf[col].dropna().tolist())
+            
+            calc_vmin = min(all_values) if all_values else 0
+            calc_vmax = max(all_values) if all_values else 1
+            
+            # Сужаем диапазон для большей выразительности только если color_by_average=True
+            if color_by_average:
+                calc_vmin = calc_vmin + (calc_vmax - calc_vmin) * 0.25  # Сдвигаем нижнюю границу на 25% вверх
+                calc_vmax = calc_vmax - (calc_vmax - calc_vmin) * 0.25  # Сдвигаем верхнюю границу на 25% вниз
+            
+            # Устанавливаем vmin и vmax, если они не заданы
+            vmin = calc_vmin if vmin is None else vmin
+            vmax = calc_vmax if vmax is None else vmax
         
-        vmin = min(all_values) if all_values else 0
-        vmax = max(all_values) if all_values else 1
+        # Проверяем, что vmin меньше vmax
+        if vmin >= vmax:
+            raise ValueError("vmin должен быть меньше vmax")
         
-        # Цветовая шкала для карты ('YlOrRd' цветовая схема: желтый -> оранжевый -> красный)
+        # Цветовая шкала для карты (зеленый -> оранжевый -> красный)
         colormap = cm.LinearColormap(['green', 'orange', 'red'], vmin=vmin, vmax=vmax)
         
         # Цветовая карта для гистограмм (зеленый -> красный для нормализованных значений)
         bar_colormap = cm.LinearColormap(['green', 'orange', 'red'], vmin=0, vmax=1)
         
-        # Гистограмма для точек (без среднего)
-        def create_point_histogram_html(row, groups):
-            html = """
-            <style>
-                .popup-container {
-                    display: flex;
-                    flex-wrap: wrap;
-                    justify-content: space-between;
-                    max-width: 600px;
-                }
-                .group-container {
-                    width: 48%;
-                    margin-bottom: 10px;
-                    font-family: Arial, sans-serif;
-                    color: #333;
-                    background-color: #f9f9f9;
-                    padding: 5px;
-                    border-radius: 3px;
-                }
-                .group-title {
-                    font-weight: bold;
-                    color: #222;
-                    margin-bottom: 5px;
-                    font-size: 14px;
-                }
-                .bar-container {
-                    margin: 2px 0;
-                    font-size: 11px;
-                }
-                .bar {
-                    height: 12px;
-                    border-radius: 3px;
-                    display: inline-block;
-                    vertical-align: middle;
-                    color: white;
-                    text-align: right;
-                    padding-right: 5px;
-                    box-sizing: border-box;
-                    min-width: 30px;
-                }
-                .label {
-                    display: inline-block;
-                    width: 120px;
-                    margin-right: 5px;
-                    color: #333;
-                }
-            </style>
-            <div class="popup-container">
-            """
-            
-            max_val = max(row[columns].max(), 1)
-            
-            for group_name, group_cols in groups.items():
-                display_name = 'spatial inequality' if group_name == 'provision' else group_name
-                html += f'<div class="group-container"><div class="group-title">{display_name}</div>'
-                for col in group_cols:
-                    if col in row.index:
-                        value = row[col]
-                        if pd.notnull(value):
-                            normalized_value = value / max_val if max_val > 0 else 0
-                            bar_color = bar_colormap(normalized_value)
-                            width = (value / max_val) * 150
-                            html += f"""
-                            <div class="bar-container">
-                                <span class="label">{col}</span>
-                                <span class="bar" style="width: {width}px; background: {bar_color};">{round(value, 3)}</span>
-                            </div>
-                            """
-                html += '</div>'
-            
-            html += '</div>'
-            return html
-        
-        # Гистограмма для полигонов (с добавлением среднего, кроме provision)
-        def create_polygon_histogram_html(row, groups):
+        # Общая функция для создания HTML гистограммы
+        def create_histogram_html(row, groups, include_group_means=False):
             html = """
             <style>
                 .popup-container {
@@ -370,47 +329,40 @@ class SpatialInequalityCalculator():
                 }
                 .average-bar {
                     font-weight: bold;
-                    background: #FF5500 !important;
                 }
             </style>
             <div class="popup-container">
             """
             
-            # Рассчитываем общее среднее по всем атрибутам
-            available_columns = [col for col in columns if col in row.index and pd.notnull(row[col])]
-            if available_columns:
-                overall_avg = row[available_columns].mean()
-            else:
-                overall_avg = np.nan
+            # Используем предвычисленное значение spatial_inequality
+            overall_avg = row.get('spatial_inequality', np.nan)
             
-            # Определяем максимальное значение
-            all_values = [row[col] for col in available_columns if pd.notnull(row[col])]
-            if all_values:
-                max_val = max(max(all_values), 1)
-            else:
-                max_val = 1
+            # Определяем максимальное значение для нормализации гистограммы
+            all_values = [row[col] for col in columns if col in row.index and pd.notnull(row[col])]
+            max_val = max(all_values, default=1) if all_values else 1
             
             # Добавляем общее среднее значение в начале
             if pd.notnull(overall_avg):
-                normalized_avg = overall_avg / max_val if max_val > 0 else 0
                 avg_width = (overall_avg / max_val) * 150
+                normalized_avg = overall_avg / max_val if max_val > 0 else 0
+                avg_color = bar_colormap(normalized_avg)  # Используем bar_colormap для цвета
                 html += f"""
                 <div class="group-container" style="width: 100%;">
-                    <div class="group-title">Общее среднее значение</div>
+                    <div class="group-title">Пространственное неравенство</div>
                     <div class="bar-container">
-                        <span class="label">Среднее всех атрибутов</span>
-                        <span class="bar average-bar" style="width: {avg_width}px;">{round(overall_avg, 3)}</span>
+                        <span class="label">Значение неравенства</span>
+                        <span class="bar average-bar" style="width: {avg_width}px; background: {avg_color};">{round(overall_avg, 3)}</span>
                     </div>
                 </div>
                 """
             
             # Добавляем остальные группы
             for group_name, group_cols in groups.items():
-                display_name = 'spatial inequality' if group_name == 'provision' else group_name
+                display_name = group_name + ' inequality'
                 html += f'<div class="group-container"><div class="group-title">{display_name}</div>'
                 
-                # Добавляем среднее по группе (кроме provision)
-                if group_name != 'provision' and f'{group_name}_mean' in row.index:
+                # Добавляем среднее по группе, если указано (для полигонов, кроме provision)
+                if include_group_means and group_name != 'provision' and f'{group_name}_mean' in row.index:
                     mean_value = row[f'{group_name}_mean']
                     if pd.notnull(mean_value):
                         normalized_mean = mean_value / max_val if max_val > 0 else 0
@@ -443,13 +395,11 @@ class SpatialInequalityCalculator():
             return html
         
         # Добавляем точки (города)
-        for _, row in towns_result.iterrows():
+        for _, row in spatial_inequality_gdf.iterrows():
             # Определяем цвет точки
             if color_by_average or selected_attribute is None:
-                available_columns = [col for col in columns if col in row.index and pd.notnull(row[col])]
-                if available_columns:
-                    avg_value = row[available_columns].mean()
-                    color = colormap(avg_value)
+                if 'spatial_inequality' in row.index and pd.notnull(row['spatial_inequality']):
+                    color = colormap(row['spatial_inequality'])
                 else:
                     color = '#888888'  # Серый цвет для точек без данных
             else:
@@ -461,11 +411,11 @@ class SpatialInequalityCalculator():
             # Название города (для всплывающей подсказки)
             city_name = row.get('name', f"Город {_}")
             
-            # Создаем всплывающую подсказку
+            # Создаем всплывающую подсказку для точек (без среднего по группам)
             popup_html = f"""
             <b>Город: {city_name}</b><br>
             Население: {row.get('population', 'Н/Д')}<br>
-            {create_point_histogram_html(row, groups)}
+            {create_histogram_html(row, groups, include_group_means=False)}
             """
             
             # Добавляем точку на карту
@@ -479,18 +429,15 @@ class SpatialInequalityCalculator():
                 fill_opacity=0.7,
                 popup=folium.Popup(popup_html, max_width=600)
             ).add_to(points_layer)
-    
         
         # Добавляем полигоны
         territories_layer = folium.FeatureGroup(name="Territories")
         
-        for _, row in gpsp_spatial_inequality.iterrows():
+        for _, row in polygon_spatial_inequality.iterrows():
             # Определяем цвет полигона
             if color_by_average or selected_attribute is None:
-                available_columns = [col for col in columns if col in row.index and pd.notnull(row[col])]
-                if available_columns:
-                    avg_value = row[available_columns].mean()
-                    fill_color = colormap(avg_value)
+                if 'spatial_inequality' in row.index and pd.notnull(row['spatial_inequality']):
+                    fill_color = colormap(row['spatial_inequality'])
                 else:
                     fill_color = '#888888'  # Серый цвет для полигонов без данных
             else:
@@ -513,10 +460,10 @@ class SpatialInequalityCalculator():
             # Название территории (для всплывающей подсказки)
             territory_name = row.get('name', f"Территория {row['anchor_name']}")
             
-            # Создаем всплывающую подсказку
+            # Создаем всплывающую подсказку для полигонов (с средним по группам)
             popup_html = f"""
             <b>Название: {territory_name}</b><br>
-            {create_polygon_histogram_html(row, groups)}
+            {create_histogram_html(row, groups, include_group_means=True)}
             """
             
             folium.Popup(popup_html, max_width=600).add_to(geo_json)
@@ -530,7 +477,7 @@ class SpatialInequalityCalculator():
         
         # Добавляем цветовую шкалу с соответствующей подписью
         if color_by_average:
-            colormap.caption = "Среднее значение всех атрибутов"
+            colormap.caption = "Пространственное неравенство"
         elif selected_attribute:
             colormap.caption = f"Значение атрибута: {selected_attribute}"
         else:
