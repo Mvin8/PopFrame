@@ -21,7 +21,7 @@ CITY_LEVELS = [
 
 class AgglomerationBuilder(BaseMethod):
 
-    def _build_agglomeration(self, towns):
+    def _build_agglomeration(self, towns, time):
         """
         Builds agglomerations for cities based on the accessibility matrix and travel time.
         
@@ -36,7 +36,7 @@ class AgglomerationBuilder(BaseMethod):
         agglomerations = []
 
         for level_index, level in enumerate(reversed(CITY_LEVELS)):
-            max_time = 80 - 10 * level_index
+            max_time = time - 10 * level_index
             level_nodes = towns[towns['level'] == level].sort_values(by='population', ascending=False)
 
             for node, population in level_nodes[['id', 'population']].itertuples(index=False):
@@ -244,7 +244,7 @@ class AgglomerationBuilder(BaseMethod):
         return towns
 
 
-    def get_agglomerations(self, update_df: pd.DataFrame | None = None):
+    def get_agglomerations(self, update_df: pd.DataFrame | None = None, time: int = 80):
         """
         The main function that orchestrates the creation, merging, and finalization of agglomerations.
         
@@ -257,7 +257,7 @@ class AgglomerationBuilder(BaseMethod):
         region_boundary = self.region.region
 
         # Step 1: Build agglomerations
-        agglomeration_gdf = self._build_agglomeration(towns)
+        agglomeration_gdf = self._build_agglomeration(towns, time)
                 # Step 4: Simplify multipolygons
         agglomeration_gdf = self._simplify_multipolygons(agglomeration_gdf)
         # Step 2: Merge intersecting agglomerations and update population data

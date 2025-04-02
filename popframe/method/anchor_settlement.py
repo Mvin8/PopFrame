@@ -19,12 +19,12 @@ import numpy as np
 import branca.colormap as cm
 
 RADIUS = 260
-MAX_ANCHOR_TIME = 50
+
 
 
 class AnchorSettlementBuilder(BaseMethod):
     
-    def _build_anchor_settlement_boundaries(self, towns):
+    def _build_anchor_settlement_boundaries(self, towns, time):
         """
         Builds boundaries for anchor settlements iteratively, starting from the closest town based on travel time.
         
@@ -40,7 +40,7 @@ class AnchorSettlementBuilder(BaseMethod):
         accessibility_matrix = self.region.accessibility_matrix
         
         for node in anchor_towns['id']:
-            boundary = self._get_boundary_around_node(node, MAX_ANCHOR_TIME, towns, accessibility_matrix)
+            boundary = self._get_boundary_around_node(node, time, towns, accessibility_matrix)
             
             if boundary:
                 boundary["name"] = towns.loc[towns['id'] == node, 'name'].values[0]
@@ -319,7 +319,7 @@ class AnchorSettlementBuilder(BaseMethod):
         
         return merged_gdf
     
-    def get_anchor_settlement_boundaries(self, towns, update_df: pd.DataFrame | None = None):
+    def get_anchor_settlement_boundaries(self, towns, update_df: pd.DataFrame | None = None,  time: int = 50):
         """
         The main function that orchestrates the creation, merging, and finalization of anchor settlement boundaries.
         
@@ -338,7 +338,7 @@ class AnchorSettlementBuilder(BaseMethod):
         local_crs = self.region.region.crs
         towns = towns.to_crs(local_crs)
         
-        boundary_gdf = self._build_anchor_settlement_boundaries(towns)
+        boundary_gdf = self._build_anchor_settlement_boundaries(towns, time)
   
         boundary_gdf = self._simplify_multipolygons(boundary_gdf, towns)
         
