@@ -252,6 +252,10 @@ class AgglomerationBuilder(BaseMethod):
         - A GeoDataFrame with the finalized agglomerations, merged, simplified, and overlaid on region boundaries.
         """
         # towns = self._get_towns_gdf(update_df)
+        if time < 50:
+            print("Минимально допустимое значение параметра 'time' — 50 минут.")
+            time = 50
+        
         towns = self.region.get_update_towns_gdf(update_df)
 
         region_boundary = self.region.region
