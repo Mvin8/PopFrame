@@ -244,38 +244,43 @@ class AgglomerationBuilder(BaseMethod):
         return towns
 
 
-    def get_agglomerations(self, update_df: pd.DataFrame | None = None, time: int = 80):
+    def get_agglomerations(self, update_df: pd.DataFrame | None = None, time: int = 80) -> gpd.GeoDataFrame:
         """
         The main function that orchestrates the creation, merging, and finalization of agglomerations.
         
         Returns:
         - A GeoDataFrame with the finalized agglomerations, merged, simplified, and overlaid on region boundaries.
         """
-        # towns = self._get_towns_gdf(update_df)
+
+        towns = self.region.get_update_towns_gdf(update_df)
+        
+        if towns is None or len(towns) < 2:
+            raise ValueError("Для построения агломерации требуется минимум два города.")
+        
+        # Проверяем, что хотя бы у двух городов есть ненулевое население
+        valid_pop = towns['population'].notnull() & (towns['population'] > 0)
+        if valid_pop.sum() < 2:
+            raise ValueError("Требуются данные о населении минимум у двух разных городов.")
+        
         if time < 50:
-            print("Минимально допустимое значение параметра 'time' — 50 минут.")
+            print("Минимально допустимое значение параметра 'time' — 50 минут. Заменяю на 50.")
             time = 50
         
-        towns = self.region.get_update_towns_gdf(update_df)
-
         region_boundary = self.region.region
 
         # Step 1: Build agglomerations
         agglomeration_gdf = self._build_agglomeration(towns, time)
-                # Step 4: Simplify multipolygons
-        agglomeration_gdf = self._simplify_multipolygons(agglomeration_gdf)
+        
         # Step 2: Merge intersecting agglomerations and update population data
+        agglomeration_gdf = self._simplify_multipolygons(agglomeration_gdf)
+        
+        # Step 3: Overlay agglomerations on region boundaries
         agglomeration_gdf = self._merge_intersecting_agglomerations(agglomeration_gdf, towns)
 
-        # Step 3: Overlay agglomerations on region boundaries
-        agglomeration_gdf = gpd.overlay(agglomeration_gdf, region_boundary, how='intersection')
-
         # Step 4: Simplify multipolygons
-        agglomeration_gdf = self._simplify_multipolygons(agglomeration_gdf)
-
+        agglomeration_gdf = gpd.overlay(agglomeration_gdf, region_boundary, how='intersection')
+        
         # Step 5: Final geometry corrections
-        agglomeration_gdf['geometry'] = agglomeration_gdf['geometry'].apply(
-            lambda geom: Polygon(geom.exterior) if geom.is_valid else geom
-        )
-
+        agglomeration_gdf = self._simplify_multipolygons(agglomeration_gdf)
+        
         return agglomeration_gdf
