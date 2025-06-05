@@ -122,7 +122,7 @@ class AdjacencyCalculator(BaseModel):  # pylint: disable=too-few-public-methods
                 for d_ in d.values():
                     v__ = graph_nk.addNodes(2)
                     u__ = v__ - 1
-                    w = round(d[weight], 1) if weight in d else 1
+                    w = round(d_[weight], 1) if weight in d_ else 1
                     graph_nk.addEdge(u, v, w)
                     graph_nk.addEdge(u_, u__, 0)
                     graph_nk.addEdge(v_, v__, 0)
