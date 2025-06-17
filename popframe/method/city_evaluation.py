@@ -93,56 +93,68 @@ class CityPopulationScorer:
         self.gdf_hex = self.gdf_hex.rename(columns={'density_mo': 'density'})
 
     def normalize_and_score(self):
-        """
-        Normalizes population and density values across all hexagons and computes a final score.
+            """
+            Нормализует population и density, считает combined_norm,
+            присваивает score = 1–5 для ячеек с данными и 0 для ячеек без данных.
+            """
+            # 1. Нормируем population
+            pop_min, pop_max = self.gdf_hex['population'].min(), self.gdf_hex['population'].max()
+            if pop_max == pop_min:
+                self.gdf_hex['norm_pop'] = 0.5
+            else:
+                self.gdf_hex['norm_pop'] = (
+                    self.gdf_hex['population'] - pop_min
+                ) / (pop_max - pop_min)
 
-        Steps:
-          1. Finds minimum and maximum of 'population' and 'density' across hexagons.
-          2. Applies min–max normalization to obtain 'norm_pop' and 'norm_dens' in [0, 1].
-             If all values are equal, sets normalized values to 0.5 to avoid division by zero.
-          3. Computes an aggregated score in [0, 1] as the average of 'norm_pop' and 'norm_dens'.
-          4. Maps the aggregated score to a 1–5 integer scale via: score = round(agg_score * 4 + 1).
+            # 2. Нормируем density
+            dens_min, dens_max = self.gdf_hex['density'].min(), self.gdf_hex['density'].max()
+            if dens_max == dens_min:
+                self.gdf_hex['norm_dens'] = 0.5
+            else:
+                self.gdf_hex['norm_dens'] = (
+                    self.gdf_hex['density'] - dens_min
+                ) / (dens_max - dens_min)
 
-        Modifies:
-            self.gdf_hex: Adds columns 'norm_pop', 'norm_dens', 'agg_score', and 'score'.
-        """
-        # 1. Нормируем population и density в диапазон [0,1]
-        pop_min, pop_max = self.gdf_hex['population'].min(), self.gdf_hex['population'].max()
-        dens_min, dens_max = self.gdf_hex['density'].min(), self.gdf_hex['density'].max()
+            # Заменяем NaN (в том числе от ячеек без данных) на 0
+            self.gdf_hex['norm_pop']  = self.gdf_hex['norm_pop'].fillna(0)
+            self.gdf_hex['norm_dens'] = self.gdf_hex['norm_dens'].fillna(0)
 
-        if pop_max == pop_min:
-            self.gdf_hex['norm_pop'] = 0.5
-        else:
-            self.gdf_hex['norm_pop'] = (self.gdf_hex['population'] - pop_min) / (pop_max - pop_min)
+            # 3. Вычисляем сырое значение
+            self.gdf_hex['combined_raw'] = (
+                self.gdf_hex['norm_pop'] + self.gdf_hex['norm_dens']
+            ) / 2
 
-        if dens_max == dens_min:
-            self.gdf_hex['norm_dens'] = 0.5
-        else:
-            self.gdf_hex['norm_dens'] = (self.gdf_hex['density'] - dens_min) / (dens_max - dens_min)
+            # 4. Мин–макс нормируем combined_raw
+            raw_min, raw_max = (
+                self.gdf_hex['combined_raw'].min(),
+                self.gdf_hex['combined_raw'].max()
+            )
+            if raw_max == raw_min:
+                self.gdf_hex['combined_norm'] = 0.5
+            else:
+                self.gdf_hex['combined_norm'] = (
+                    self.gdf_hex['combined_raw'] - raw_min
+                ) / (raw_max - raw_min)
 
-        self.gdf_hex['norm_pop']  = self.gdf_hex['norm_pop'].fillna(0)
-        self.gdf_hex['norm_dens'] = self.gdf_hex['norm_dens'].fillna(0)
+            self.gdf_hex['combined_norm'] = self.gdf_hex['combined_norm'].fillna(0)
 
-        self.gdf_hex['combined_raw'] = (self.gdf_hex['norm_pop'] + self.gdf_hex['norm_dens']) / 2
+            # 5. Присваиваем оценку:
+            #    – для ячеек с данными: масштабируем в [1;5]
+            #    – для ячеек без данных (вода): оставляем 0
+            # 5.1 Сначала проставляем всем 1–5
+            self.gdf_hex['score'] = (
+                (self.gdf_hex['combined_norm'] * 4 + 1)
+                .round()
+                .clip(lower=1, upper=5)
+                .astype(int)
+            )
 
-
-        raw_min, raw_max = self.gdf_hex['combined_raw'].min(), self.gdf_hex['combined_raw'].max()
-        if raw_max == raw_min:
-            self.gdf_hex['combined_norm'] = 0.5
-        else:
-            self.gdf_hex['combined_norm'] = (
-                self.gdf_hex['combined_raw'] - raw_min
-            ) / (raw_max - raw_min)
-
-        self.gdf_hex['combined_norm'] = self.gdf_hex['combined_norm'].fillna(0)
-
-        self.gdf_hex['score'] = (
-            (self.gdf_hex['combined_norm'] * 4 + 1)
-            .round()                      # округляем до ближайшего целого
-            .clip(lower=1, upper=5)       # теперь минимальный балл = 1
-            .astype(int)
-        )
-
+            # 5.2 Выставляем 0 там, где нет ни population, ни density
+            mask_no_data = (
+                self.gdf_hex['population'].isna()
+                & self.gdf_hex['density'].isna()
+            )
+            self.gdf_hex.loc[mask_no_data, 'score'] = 0
 
     def assign_interpretations(self):
         """
