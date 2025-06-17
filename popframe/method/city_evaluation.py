@@ -120,15 +120,12 @@ class CityPopulationScorer:
         else:
             self.gdf_hex['norm_dens'] = (self.gdf_hex['density'] - dens_min) / (dens_max - dens_min)
 
-        # Если в population или density были NaN, то и norm_pop/norm_dens станут NaN. 
-        # Заранее заменим их на 0, чтобы в combined_raw не появилось NaN:
         self.gdf_hex['norm_pop']  = self.gdf_hex['norm_pop'].fillna(0)
         self.gdf_hex['norm_dens'] = self.gdf_hex['norm_dens'].fillna(0)
 
-        # 2. Считаем «сырое» агрегированное значение
         self.gdf_hex['combined_raw'] = (self.gdf_hex['norm_pop'] + self.gdf_hex['norm_dens']) / 2
 
-        # 3. Мин–макс нормируем combined_raw, чтобы у «лучшего» гекса получилось exactly 1.0
+
         raw_min, raw_max = self.gdf_hex['combined_raw'].min(), self.gdf_hex['combined_raw'].max()
         if raw_max == raw_min:
             self.gdf_hex['combined_norm'] = 0.5
@@ -137,17 +134,13 @@ class CityPopulationScorer:
                 self.gdf_hex['combined_raw'] - raw_min
             ) / (raw_max - raw_min)
 
-        # Если combined_raw был NaN (например, оба norm_pop и norm_dens оказались NaN),
-        # то combined_norm тоже стал NaN. Подменим такие NaN на 0:
         self.gdf_hex['combined_norm'] = self.gdf_hex['combined_norm'].fillna(0)
 
-        # 4. Масштабируем normalized combined в диапазон 0–5 и округляем
-        #    После fillna(0) больше нет NaN, и .astype(int) сработает без ошибок.
         self.gdf_hex['score'] = (
-            (self.gdf_hex['combined_norm'] * 5)
-            .round()                     # округляем до ближайшего целого
-            .clip(lower=0, upper=5)      # гарантируем, что результат будет в [0,5]
-            .astype(int)                 # переводим в целые числа
+            (self.gdf_hex['combined_norm'] * 4 + 1)
+            .round()                      # округляем до ближайшего целого
+            .clip(lower=1, upper=5)       # теперь минимальный балл = 1
+            .astype(int)
         )
 
 
