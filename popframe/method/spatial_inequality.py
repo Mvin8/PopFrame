@@ -124,50 +124,29 @@ class SpatialInequalityCalculator(BaseMethod):
 
 
     def calculate_polygon_spatial_inequality(self, spatial_inequality_gdf, settlement_boundaries):
-        """
-        Вычисляет средние оценки для полигонов на основе оценок городов внутри них.
-        
-        Параметры:
-        spatial_inequality_gdf (GeoDataFrame): GeoDataFrame с городами и их оценками.
-        settlement_boundaries (GeoDataFrame): GeoDataFrame с полигонами для записи средних оценок.
-
-        Возвращает:
-        GeoDataFrame: Копия исходного GeoDataFrame с полигонами и средними оценками.
-        """
-        # Создаём копию result_gdf для записи новых оценок
-        polygon_spatial_inequality = settlement_boundaries.copy()
-
-        # Добавляем в polygon_spatial_inequality столбцы для оценок (инициализируем NaN)
-        for col in SCORE_COLUMNS:
-            polygon_spatial_inequality[col] = np.nan
-
         local_crs = self.region.region.crs
         spatial_inequality_gdf = spatial_inequality_gdf.to_crs(local_crs)
         settlement_boundaries = settlement_boundaries.to_crs(local_crs)
-        
-        # Проходим по каждому полигону в polygon_spatial_inequality
-        for idx, poly in polygon_spatial_inequality.iterrows():
-            poly_geom = poly.geometry
-            # Отбираем города, которые полностью находятся внутри полигона
-            towns_in_poly = spatial_inequality_gdf[spatial_inequality_gdf.within(poly_geom)]
-            
-            # Если городов внутри полигона нет, переходим к следующему
-            if towns_in_poly.empty:
-                continue
-            
-            # Для каждого оценочного столбца вычисляем среднее значение по городам внутри полигона
-            for col in SCORE_COLUMNS:
-                mean_score = towns_in_poly[col].mean()
-                polygon_spatial_inequality.loc[idx, col] = mean_score
 
-        
-        # Шаг 3: Анализ распределения городов внутри и вне полигонов
-        stats_json = self.analyze_town_distribution(spatial_inequality_gdf, polygon_spatial_inequality)
+        # spatial join: присоединим к каждому городу индекс полигона, в котором он лежит
+        joined = gpd.sjoin(
+            spatial_inequality_gdf[SCORE_COLUMNS + ['geometry']],
+            settlement_boundaries[['geometry']],
+            how='inner',
+            predicate='within'
+        )
 
+        # сгруппируем по номеру полигона (index_right) и найдём среднее
+        means = joined.groupby('index_right')[SCORE_COLUMNS].mean()
+
+        # сделаем копию полигонов и запишем в неё средние
+        polygon_spatial_inequality = settlement_boundaries.copy()
+        for col in SCORE_COLUMNS:
+            polygon_spatial_inequality[col] = polygon_spatial_inequality.index.map(means[col])
         polygon_spatial_inequality['spatial_inequality'] = polygon_spatial_inequality[SCORE_COLUMNS].mean(axis=1)
 
+        stats_json = self.analyze_town_distribution(spatial_inequality_gdf, polygon_spatial_inequality)
         return polygon_spatial_inequality, stats_json
-
 
 
     def analyze_town_distribution(self, towns_result, polygon_spatial_inequality):
@@ -463,7 +442,10 @@ class SpatialInequalityCalculator(BaseMethod):
             )
             
             # Название территории (для всплывающей подсказки)
-            territory_name = row.get('name', f"Территория {row['anchor_name']}")
+            if 'name' in row.index and pd.notnull(row['name']):
+                territory_name = row['name']
+            else:
+                territory_name = f"Территория {row.get('anchor_name', _)}"
             
             # Создаем всплывающую подсказку для полигонов (с средним по группам)
             popup_html = f"""
