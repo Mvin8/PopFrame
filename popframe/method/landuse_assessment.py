@@ -1,6 +1,4 @@
-
 import osmnx as ox
-import sys
 import geopandas as gpd
 from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
 from shapely.ops import unary_union

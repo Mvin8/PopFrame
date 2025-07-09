@@ -91,8 +91,7 @@ class TerritoryEvaluation(BaseMethod):
 
         return ranked_profiles
 
-
-    def evaluate_territory_location(self, territories):
+    def evaluate_territory_location(self, territories_gdf):
         """
         Main function to evaluate the location of a territory relative to settlements.
 
@@ -104,7 +103,6 @@ class TerritoryEvaluation(BaseMethod):
             list: A list of evaluation results for each territory.
         """
         settlements_gdf = self.region.get_towns_gdf()
-        territories_gdf = territories if territories is not None else self.region.get_territories_gdf()
 
         # Coordinate system transformation
         settlements_gdf = settlements_gdf.to_crs(epsg=3857)
@@ -249,7 +247,6 @@ class TerritoryEvaluation(BaseMethod):
         Returns:
             tuple: The pair of nearest settlements and the minimum distance.
         """
-        from itertools import combinations
 
         min_distance = float('inf')
         closest_settlement1 = None
@@ -270,7 +267,7 @@ class TerritoryEvaluation(BaseMethod):
 
         return closest_settlement1, closest_settlement2
        
-    def population_criterion(self, territories):
+    def population_criterion(self, territories_gdf):
         """
         Calculates population density and assesses territories based on demographic characteristics.
 
@@ -280,7 +277,7 @@ class TerritoryEvaluation(BaseMethod):
         Returns:
         list: A list of dictionaries containing the assessment results for each territory.
         """
-        gdf_territory = self._get_territories_gdf(territories)
+        gdf_territory = territories_gdf.to_crs(epsg=3857)
         towns_gdf = self.region.get_towns_gdf().to_crs(epsg=3857)
         results = self._calculate_density_population(gdf_territory, towns_gdf)
         
@@ -290,20 +287,6 @@ class TerritoryEvaluation(BaseMethod):
             result['interpretation'] = self._interpret_score(score)
 
         return results
-
-    def _get_territories_gdf(self, territories):
-        """
-        Gets the GeoDataFrame of territories, transformed to CRS 3857.
-
-        Parameters:
-        territories (GeoDataFrame or None): GeoDataFrame of territories or None to use default region territories.
-
-        Returns:
-        GeoDataFrame: The territories GeoDataFrame transformed to CRS 3857.
-        """
-        if territories is None:
-            return self.region.get_territories_gdf().to_crs(epsg=3857)
-        return territories.to_crs(epsg=3857)
 
     def _calculate_density_population(self, gdf_territory, towns_gdf, radius_m=20000):
         """
@@ -320,7 +303,7 @@ class TerritoryEvaluation(BaseMethod):
         results = []
         for _, territory in gdf_territory.iterrows():
             buffer = territory.geometry.buffer(radius_m)
-            towns_in_buffer = gpd.sjoin(towns_gdf, gpd.GeoDataFrame(geometry=[buffer], crs=towns_gdf.crs), op='intersects')
+            towns_in_buffer = gpd.sjoin(towns_gdf, gpd.GeoDataFrame(geometry=[buffer], crs=towns_gdf.crs), predicate='intersects')
 
             if not towns_in_buffer.empty:
                 total_population = towns_in_buffer['population'].sum()

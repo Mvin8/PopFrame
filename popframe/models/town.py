@@ -69,4 +69,4 @@ class Town(BaseModel):
         dict
             A dictionary where the keys are the indices of the GeoDataFrame and the values are Town instances.
         """
-        return {i: cls(id=i, **gdf.loc[i].to_dict()) for i in gdf.index}
+        return {i: cls(**{**gdf.loc[i].to_dict(), 'id': i}) for i in gdf.index}
