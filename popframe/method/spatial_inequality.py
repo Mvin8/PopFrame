@@ -444,8 +444,10 @@ class SpatialInequalityCalculator(BaseMethod):
             # Название территории (для всплывающей подсказки)
             if 'name' in row.index and pd.notnull(row['name']):
                 territory_name = row['name']
+            elif 'anchor_name' in row.index and pd.notnull(row['anchor_name']):
+                territory_name = row['anchor_name']
             else:
-                territory_name = f"Территория {row.get('anchor_name', _)}"
+                territory_name = f"Территория {_}"
             
             # Создаем всплывающую подсказку для полигонов (с средним по группам)
             popup_html = f"""
