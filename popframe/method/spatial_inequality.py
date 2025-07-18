@@ -5,9 +5,9 @@ from popframe.method.base_method import BaseMethod  # замените на ва
 
 class SpatialInequalityCalculator(BaseMethod):
     """
-    Калькулятор пространственных показателей неравенства.
-    Содержит методы для переноса показателей неравенства из точек в полигоны,
-    поиска оптимальной территории и определения «лучшей» группы.
+    Calculator for spatial inequality metrics.
+    Contains methods for transferring inequality metrics from points to polygons,
+    finding the optimal territory, and determining the "best" group.
     """
 
     def transfer_inequality_metrics_to_polygons(
@@ -17,19 +17,32 @@ class SpatialInequalityCalculator(BaseMethod):
         inequality_keyword: str = "Неравенство"
     ) -> Tuple[gpd.GeoDataFrame, Dict[str, Dict[str, float]]]:
         """
-        Переносит все колонки, содержащие показатели неравенства
-        из точек (городов) на полигоны (агломераций) усреднением по территории.
+        Transfer all columns containing inequality metrics from points (cities) to polygons (agglomerations)
+        by averaging over the territory.
 
-        Возвращает:
-            gdf_polygons_with_metrics: GeoDataFrame полигонами с новыми колонками метрик
-            stats: словарь со средними значениями внутри и вне полигонов
+        Parameters
+        ----------
+        gdf_cities : geopandas.GeoDataFrame
+            GeoDataFrame with city points and inequality metrics.
+        gdf_polygons : geopandas.GeoDataFrame
+            GeoDataFrame with polygons (agglomerations).
+        inequality_keyword : str, optional
+            Keyword to identify inequality metric columns. Default is "Неравенство".
+
+        Returns
+        -------
+        tuple
+            (gdf_polygons_with_metrics, stats)
+            gdf_polygons_with_metrics : geopandas.GeoDataFrame
+                Polygons with new metric columns.
+            stats : dict
+                Dictionary with mean values inside and outside polygons.
         """
         # 1) Колонки с нужным ключевым словом
         pattern = re.compile(rf".*\b{re.escape(inequality_keyword)}\b.*", re.IGNORECASE)
         metric_cols = [c for c in gdf_cities.columns if isinstance(c, str) and pattern.match(c)]
         if not metric_cols:
             raise KeyError(f"Не найдено колонок с '{inequality_keyword}'")
-
         # 2) Гео‑объединение точек и полигонов
         cities_with_idx = gpd.sjoin(
             gdf_cities[metric_cols + ['geometry']],
@@ -37,7 +50,6 @@ class SpatialInequalityCalculator(BaseMethod):
             how='left',
             predicate='within'
         )
-
         # 3) Усреднение по индексам полигонов
         grouped = (
             cities_with_idx
@@ -45,7 +57,6 @@ class SpatialInequalityCalculator(BaseMethod):
             .mean()
             .rename_axis('poly_index')
         )
-
         # 4) Присоединяем к полигонам
         gdf_polygons_with_metrics = (
             gdf_polygons
@@ -54,20 +65,16 @@ class SpatialInequalityCalculator(BaseMethod):
             .merge(grouped.reset_index(), on='poly_index', how='left')
             .set_index('poly_index')
         )
-
         # 5) Статистика внутри/вне
         inside  = cities_with_idx.dropna(subset=['index_right'])
         outside = cities_with_idx[cities_with_idx['index_right'].isna()]
-
         mean_within = inside[metric_cols].mean().to_dict()
         mean_outside = outside[metric_cols].mean().to_dict()
         stats = {
             'mean_within': mean_within,
             'mean_outside': mean_outside
         }
-
         return gdf_polygons_with_metrics, stats
-
 
     def get_best_territory(
         self,
@@ -78,54 +85,49 @@ class SpatialInequalityCalculator(BaseMethod):
         top_n: int = 5
     ) -> gpd.GeoDataFrame:
         """
-        Возвращает до `top_n` территорий (строк) с минимальным значением пространственного неравенства.
+        Return up to `top_n` territories (rows) with the minimum spatial inequality value.
 
-        Если задана группа, отбирает только:
-        • все колонки с «Неравенство» для этой группы
-        • все прочие колонки, НЕ содержащие «Неравенство»
-        Если группа не указана — возвращаются первые `top_n` по общему показателю.
+        If a group is specified, selects only:
+        - all columns with "Неравенство" for this group
+        - all other columns NOT containing "Неравенство"
+        If no group is specified, returns the first `top_n` by the overall metric.
 
-        Параметры:
-            gdf (GeoDataFrame): должен содержать geometry и
-                колонки с суффиксом spatial_suffix.
-            group_name (str|None): название соц‑группы без суффикса.
-            spatial_suffix (str): суффикс для поиска основной метрики.
-            default_col (str): имя столбца общего неравенства.
-            top_n (int): сколько лучших территорий вернуть (по возрастанию показателя).
+        Parameters
+        ----------
+        gdf : geopandas.GeoDataFrame
+            GeoDataFrame containing geometry and columns with the spatial_suffix.
+        group_name : str or None, optional
+            Name of the social group without suffix.
+        spatial_suffix : str, optional
+            Suffix for searching the main metric. Default is " - Неравенство".
+        default_col : str, optional
+            Name of the overall inequality column. Default is "Пространственное неравенство".
+        top_n : int, optional
+            How many best territories to return (by ascending metric). Default is 5.
 
-        Возвращает:
-            GeoDataFrame: до `top_n` строк с минимальными значениями.
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            Up to `top_n` rows with the minimum values.
         """
         if top_n < 1:
             raise ValueError("Параметр top_n должен быть >= 1")
-
         if group_name:
             primary_col = f"{group_name.strip()}{spatial_suffix}"
             if primary_col not in gdf.columns:
                 raise KeyError(f"В GeoDataFrame нет колонки «{primary_col}»")
-
-            # сортируем по нужной метрике и берём до top_n
             top_df = gdf.sort_values(primary_col, ascending=True).head(top_n).copy()
-
-            # колонки-метрики для этой группы
             pattern = re.compile(
                 rf"^{re.escape(group_name.strip())}.*\bНеравенство\b", re.IGNORECASE
             )
             group_metrics = [c for c in top_df.columns if pattern.match(c)]
             non_metrics = [c for c in top_df.columns if "Неравенство" not in c]
-
             keep_cols = non_metrics + group_metrics
             return top_df[keep_cols]
-
         else:
             if default_col not in gdf.columns:
                 raise KeyError(f"В GeoDataFrame нет колонки «{default_col}»")
-
-            # сортируем по default_col и берём до top_n
             return gdf.sort_values(default_col, ascending=True).head(top_n).copy()
-
-
-
 
     def get_best_group_for_territory(
         self,
@@ -134,8 +136,21 @@ class SpatialInequalityCalculator(BaseMethod):
         new_col: str = "Наименьшее неравенство для соц‑группы"
     ) -> gpd.GeoDataFrame:
         """
-        Добавляет столбец с названием соц‑группы,
-        у которой минимальный показатель неравенства.
+        Add a column with the name of the social group with the minimum inequality metric.
+
+        Parameters
+        ----------
+        gdf : geopandas.GeoDataFrame
+            GeoDataFrame with group inequality metrics.
+        suffix : str, optional
+            Suffix for group metric columns. Default is " - Неравенство".
+        new_col : str, optional
+            Name of the new column to add. Default is "Наименьшее неравенство для соц‑группы".
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            GeoDataFrame with an added column for the group with the minimum inequality.
         """
         all_cols = [
             c for c in gdf.columns
@@ -145,12 +160,10 @@ class SpatialInequalityCalculator(BaseMethod):
         ]
         if not all_cols:
             raise KeyError(f"Колонки с суффиксом '{suffix}' не найдены")
-
         df_vals = gdf[all_cols]
         best_col = df_vals.idxmin(axis=1)
         pattern = re.escape(suffix) + r"$"
         best_group = best_col.str.replace(pattern, "", regex=True).str.strip()
-
         result = gdf.copy()
         result[new_col] = best_group
         return result

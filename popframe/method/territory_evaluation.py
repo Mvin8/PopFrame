@@ -16,12 +16,42 @@ class TerritoryEvaluation(BaseMethod):
 
     @classmethod
     def _is_criterion_satisfied(cls, profile_value, criterion_value):
+        """
+        Check if the criterion is satisfied for a given profile value.
+
+        Parameters
+        ----------
+        profile_value : int or tuple
+            The value or range of values for the profile criterion.
+        criterion_value : int or float
+            The value to check against the profile criterion.
+
+        Returns
+        -------
+        bool
+            True if the criterion is satisfied, False otherwise.
+        """
         if isinstance(profile_value, tuple):
             return profile_value[0] <= criterion_value <= profile_value[1]
         return criterion_value >= profile_value
 
     @classmethod
     def _calculate_exceedance(cls, profile_value, criterion_value):
+        """
+        Calculate the exceedance of the criterion value over the profile value.
+
+        Parameters
+        ----------
+        profile_value : int or tuple
+            The value or range of values for the profile criterion.
+        criterion_value : int or float
+            The value to check against the profile criterion.
+
+        Returns
+        -------
+        float
+            The amount by which the criterion value exceeds the profile value.
+        """
         if isinstance(profile_value, tuple):
             if profile_value[0] <= criterion_value <= profile_value[1]:
                 return criterion_value - profile_value[0]
@@ -29,6 +59,19 @@ class TerritoryEvaluation(BaseMethod):
         return max(0, criterion_value - profile_value)
 
     def calculate_potential(self, criteria_values):
+        """
+        Calculate the potential scores for different profiles based on criteria values.
+
+        Parameters
+        ----------
+        criteria_values : dict
+            Dictionary of criterion names and their values.
+
+        Returns
+        -------
+        list of tuple
+            Sorted list of profiles and their scores.
+        """
         profiles = {
             "Жилая застройка - ИЖС": {
                 "criteria": {"Население": 1, "Транспорт": 2, "Экология": 4, "Соц-об": 4, "Инж инф": 3},
@@ -93,14 +136,17 @@ class TerritoryEvaluation(BaseMethod):
 
     def evaluate_territory_location(self, territories_gdf):
         """
-        Main function to evaluate the location of a territory relative to settlements.
+        Evaluate the location of each territory relative to settlements.
 
-        Parameters:
-            self: The class object containing methods to retrieve settlements and territories.
-            territories (GeoDataFrame): Geospatial data with territories. If None, territories from self.region will be used.
+        Parameters
+        ----------
+        territories_gdf : geopandas.GeoDataFrame
+            Geospatial data with territories.
 
-        Returns:
-            list: A list of evaluation results for each territory.
+        Returns
+        -------
+        list of dict
+            List of evaluation results for each territory.
         """
         settlements_gdf = self.region.get_towns_gdf()
 
@@ -127,10 +173,12 @@ class TerritoryEvaluation(BaseMethod):
 
     def _get_level_scores(self):
         """
-        Returns a dictionary with scores for different levels of settlements.
+        Get the scores for different levels of settlements.
 
-        Returns:
-            dict: A dictionary where the key is the settlement level and the value is the score.
+        Returns
+        -------
+        dict
+            Dictionary where the key is the settlement level and the value is the score.
         """
         return {
             "Сверхкрупный город": 10,
@@ -148,16 +196,23 @@ class TerritoryEvaluation(BaseMethod):
 
     def _evaluate_single_territory(self, territory_geom, territory_name, settlements_gdf, level_scores):
         """
-        Evaluates a single territory, determining its nearest settlements and interpretation.
+        Evaluate a single territory, determining its nearest settlements and interpretation.
 
-        Parameters:
-            territory_geom (geometry): The geometry of the territory.
-            territory_name (str): The name of the territory.
-            settlements_gdf (GeoDataFrame): Geospatial data with settlements.
-            level_scores (dict): A dictionary with settlement level scores.
+        Parameters
+        ----------
+        territory_geom : shapely.geometry.base.BaseGeometry
+            The geometry of the territory.
+        territory_name : str
+            The name of the territory.
+        settlements_gdf : geopandas.GeoDataFrame
+            Geospatial data with settlements.
+        level_scores : dict
+            Dictionary with settlement level scores.
 
-        Returns:
-            dict: The results of the territory evaluation.
+        Returns
+        -------
+        dict
+            The results of the territory evaluation.
         """
         buffer = territory_geom.buffer(10000)
         settlements_in_buffer = settlements_gdf[settlements_gdf.geometry.intersects(buffer)]
@@ -170,15 +225,21 @@ class TerritoryEvaluation(BaseMethod):
 
     def _evaluate_nearby_settlement(self, territory_name, settlements_in_buffer, level_scores):
         """
-        Evaluates the territory if it is near settlements.
+        Evaluate the territory if it is near settlements.
 
-        Parameters:
-            territory_name (str): The name of the territory.
-            settlements_in_buffer (GeoDataFrame): The settlements within the buffer.
-            level_scores (dict): A dictionary with settlement level scores.
+        Parameters
+        ----------
+        territory_name : str
+            The name of the territory.
+        settlements_in_buffer : geopandas.GeoDataFrame
+            The settlements within the buffer.
+        level_scores : dict
+            Dictionary with settlement level scores.
 
-        Returns:
-            dict: The results of the territory evaluation.
+        Returns
+        -------
+        dict
+            The results of the territory evaluation.
         """
         settlements_in_buffer['score'] = settlements_in_buffer['level'].map(level_scores)
         max_settlement = settlements_in_buffer.loc[settlements_in_buffer['score'].idxmax()]
@@ -199,15 +260,21 @@ class TerritoryEvaluation(BaseMethod):
 
     def _evaluate_between_settlements(self, territory_geom, territory_name, settlements_gdf):
         """
-        Evaluates the territory if it is located between settlements.
+        Evaluate the territory if it is located between settlements.
 
-        Parameters:
-            territory_geom (geometry): The geometry of the territory.
-            territory_name (str): The name of the territory.
-            settlements_gdf (GeoDataFrame): Geospatial data with settlements.
+        Parameters
+        ----------
+        territory_geom : shapely.geometry.base.BaseGeometry
+            The geometry of the territory.
+        territory_name : str
+            The name of the territory.
+        settlements_gdf : geopandas.GeoDataFrame
+            Geospatial data with settlements.
 
-        Returns:
-            dict: The results of the territory evaluation.
+        Returns
+        -------
+        dict
+            The results of the territory evaluation.
         """
         buffer_20km = territory_geom.buffer(30000)
         nearby_settlements = settlements_gdf[settlements_gdf.geometry.intersects(buffer_20km)]
@@ -238,14 +305,19 @@ class TerritoryEvaluation(BaseMethod):
 
     def _find_closest_settlement_pair(self, territory_geom, nearby_settlements):
         """
-        Finds the pair of nearest settlements around the territory.
+        Find the pair of nearest settlements around the territory.
 
-        Parameters:
-            territory_geom (geometry): The geometry of the territory.
-            nearby_settlements (GeoDataFrame): The nearby settlements.
+        Parameters
+        ----------
+        territory_geom : shapely.geometry.base.BaseGeometry
+            The geometry of the territory.
+        nearby_settlements : geopandas.GeoDataFrame
+            The nearby settlements.
 
-        Returns:
-            tuple: The pair of nearest settlements and the minimum distance.
+        Returns
+        -------
+        tuple
+            The pair of nearest settlements and the minimum distance.
         """
 
         min_distance = float('inf')
@@ -269,13 +341,17 @@ class TerritoryEvaluation(BaseMethod):
        
     def population_criterion(self, territories_gdf):
         """
-        Calculates population density and assesses territories based on demographic characteristics.
+        Calculate population density and assess territories based on demographic characteristics.
 
-        Parameters:
-        territories (GeoDataFrame or None): GeoDataFrame of territories or None to use default region territories.
+        Parameters
+        ----------
+        territories_gdf : geopandas.GeoDataFrame
+            GeoDataFrame of territories.
 
-        Returns:
-        list: A list of dictionaries containing the assessment results for each territory.
+        Returns
+        -------
+        list of dict
+            List of dictionaries containing the assessment results for each territory.
         """
         gdf_territory = territories_gdf.to_crs(epsg=3857)
         towns_gdf = self.region.get_towns_gdf().to_crs(epsg=3857)
@@ -290,15 +366,21 @@ class TerritoryEvaluation(BaseMethod):
 
     def _calculate_density_population(self, gdf_territory, towns_gdf, radius_m=20000):
         """
-        Calculates population density within a specified buffer radius for each territory.
+        Calculate population density within a specified buffer radius for each territory.
 
-        Parameters:
-        gdf_territory (GeoDataFrame): GeoDataFrame of territories.
-        towns_gdf (GeoDataFrame): GeoDataFrame of towns with population data.
-        radius_m (int, optional): Radius in meters for the buffer around each territory. Default is 20000.
+        Parameters
+        ----------
+        gdf_territory : geopandas.GeoDataFrame
+            GeoDataFrame of territories.
+        towns_gdf : geopandas.GeoDataFrame
+            GeoDataFrame of towns with population data.
+        radius_m : int, optional
+            Radius in meters for the buffer around each territory. Default is 20000.
 
-        Returns:
-        list: A list of dictionaries containing population density and total population for each territory.
+        Returns
+        -------
+        list of dict
+            List of dictionaries containing population density and total population for each territory.
         """
         results = []
         for _, territory in gdf_territory.iterrows():
@@ -323,14 +405,19 @@ class TerritoryEvaluation(BaseMethod):
 
     def _assess_territory(self, density, population):
         """
-        Assesses the territory based on population density and total population.
+        Assess the territory based on population density and total population.
 
-        Parameters:
-        density (float): The average population density of the territory.
-        population (int): The total population of the territory.
+        Parameters
+        ----------
+        density : float
+            The average population density of the territory.
+        population : int
+            The total population of the territory.
 
-        Returns:
-        int: The score representing the assessment of the territory.
+        Returns
+        -------
+        int
+            The score representing the assessment of the territory.
         """
         if density == 0 and population == 0:
             return 0
@@ -356,13 +443,17 @@ class TerritoryEvaluation(BaseMethod):
 
     def _interpret_score(self, score):
         """
-        Interprets the score assigned to a territory.
+        Interpret the score assigned to a territory.
 
-        Parameters:
-        score (int): The score representing the assessment of the territory.
+        Parameters
+        ----------
+        score : int
+            The score representing the assessment of the territory.
 
-        Returns:
-        str: The interpretation of the score.
+        Returns
+        -------
+        str
+            The interpretation of the score.
         """
         interpretations = {
             0: "Территория имеет нулевые показатели численности и плотности населения, что может усложнить ее развитие.",
