@@ -16,9 +16,37 @@ class LandUseAssessment(BaseMethod):
 
     @retry(stop_max_attempt_number=5, wait_fixed=2000)
     def fetch_osm_data(self, polygon, tags):
+        """
+        Fetch OSM data for a given polygon and tags.
+
+        Parameters
+        ----------
+        polygon : shapely.geometry.Polygon
+            The polygon to fetch data for.
+        tags : dict
+            Dictionary of OSM tags to filter features.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            GeoDataFrame with OSM features.
+        """
         return ox.features_from_polygon(polygon, tags=tags)
 
     def get_landuse_data(self, territories):
+        """
+        Retrieve and process land use data for given territories.
+
+        Parameters
+        ----------
+        territories : geopandas.GeoDataFrame
+            GeoDataFrame of territories.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            GeoDataFrame with land use indicators and geometries.
+        """
         territories_gdf = territories
         if territories is None:
             territories_gdf = self.region.get_territories_gdf()
@@ -40,6 +68,19 @@ class LandUseAssessment(BaseMethod):
                       [{'natural': 'water'}, {'natural': 'wood'}, {'natural': 'grassland'}]
 
         def process_polygon(polygon):
+            """
+            Process a single polygon to extract land use data.
+
+            Parameters
+            ----------
+            polygon : shapely.geometry.Polygon
+                The polygon to process.
+
+            Returns
+            -------
+            list of dict
+                List of dictionaries with indicator and geometry.
+            """
             unique_gdfs = {}
             with ThreadPoolExecutor() as executor:
                 future_to_tag_filter = {executor.submit(self.fetch_osm_data, polygon, tag_filter): tag_filter for tag_filter in tag_filters}
@@ -91,6 +132,23 @@ class LandUseAssessment(BaseMethod):
         landuse_gdf = gpd.GeoDataFrame(all_combined_geometries, columns=['indicator', 'geometry'], crs='EPSG:4326')
 
         def adjust_geometries(main_indicator, other_gdf, landuse_gdf):
+            """
+            Adjust geometries for a main indicator by removing overlaps with others.
+
+            Parameters
+            ----------
+            main_indicator : str
+                The main indicator to adjust.
+            other_gdf : geopandas.GeoDataFrame
+                GeoDataFrame of other indicators.
+            landuse_gdf : geopandas.GeoDataFrame
+                Full land use GeoDataFrame.
+
+            Returns
+            -------
+            geopandas.GeoDataFrame
+                Adjusted GeoDataFrame.
+            """
             main_gdf = landuse_gdf[landuse_gdf['indicator'] == main_indicator]
             if not main_gdf.empty:
                 other_union = unary_union(other_gdf.geometry)
@@ -145,6 +203,20 @@ class LandUseAssessment(BaseMethod):
 
 
     def plot_landuse(self, region_gdf, landuse_gdf):
+        """
+        Plot the land use data on a map with region boundaries and legend.
+
+        Parameters
+        ----------
+        region_gdf : geopandas.GeoDataFrame
+            GeoDataFrame of the region boundary.
+        landuse_gdf : geopandas.GeoDataFrame
+            GeoDataFrame with land use data.
+
+        Returns
+        -------
+        None
+        """
         if region_gdf.crs is None:
             region_gdf.set_crs(epsg=4326, inplace=True)
         crs = region_gdf.estimate_utm_crs()

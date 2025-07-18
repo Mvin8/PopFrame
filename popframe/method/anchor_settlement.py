@@ -28,11 +28,17 @@ class AnchorSettlementBuilder(BaseMethod):
         """
         Builds boundaries for anchor settlements iteratively, starting from the closest town based on travel time.
         
-        Parameters:
-        - towns: GeoDataFrame of towns.
-        
-        Returns:
-        - A GeoDataFrame of the anchor settlement boundaries.
+        Parameters
+        ----------
+        towns : geopandas.GeoDataFrame
+            GeoDataFrame of towns.
+        time : int
+            Maximum travel time.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            GeoDataFrame of the anchor settlement boundaries.
         """
         anchor_towns = towns[towns['is_anchor_settlement'] == True]
         boundaries = []
@@ -55,6 +61,25 @@ class AnchorSettlementBuilder(BaseMethod):
         return boundary_gdf
 
     def _get_boundary_around_node(self, start_node, max_time, towns, accessibility_matrix):
+        """
+        Get the boundary around a node within a maximum travel time.
+
+        Parameters
+        ----------
+        start_node : int or str
+            The starting node (town id).
+        max_time : int
+            Maximum travel time.
+        towns : geopandas.GeoDataFrame
+            GeoDataFrame of towns.
+        accessibility_matrix : pandas.DataFrame
+            Matrix of travel times between towns.
+
+        Returns
+        -------
+        dict or None
+            Dictionary with geometry and nodes in boundary, or None if no nodes found.
+        """
         distances_from_start = accessibility_matrix.loc[start_node]
         within_time_nodes = distances_from_start[distances_from_start <= max_time].index
         
@@ -74,6 +99,21 @@ class AnchorSettlementBuilder(BaseMethod):
         }
     
     def _simplify_multipolygons(self, gdf, towns):
+        """
+        Simplify MultiPolygon geometries, keeping only those intersecting with anchor towns.
+
+        Parameters
+        ----------
+        gdf : geopandas.GeoDataFrame
+            GeoDataFrame with geometries to simplify.
+        towns : geopandas.GeoDataFrame
+            GeoDataFrame of towns.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            Simplified GeoDataFrame.
+        """
         anchor_towns = towns[towns['is_anchor_settlement'] == True]
         
         def process_geometry(geom):
@@ -95,6 +135,19 @@ class AnchorSettlementBuilder(BaseMethod):
         return gdf
                 
     def _merge_intersecting_boundaries(self, gdf):
+        """
+        Merge intersecting boundaries into single geometries.
+
+        Parameters
+        ----------
+        gdf : geopandas.GeoDataFrame
+            GeoDataFrame with boundaries to merge.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            GeoDataFrame with merged boundaries.
+        """
         merged_geometries = []
         processed_indices = set()
 
@@ -141,14 +194,40 @@ class AnchorSettlementBuilder(BaseMethod):
 
 
     def split_multipolygons(self, geometry):
-        """Разбивает MultiPolygon на отдельные полигоны и помечает все, кроме самого большого, как 'создан'."""
+        """
+        Split MultiPolygon into individual polygons, marking all but the largest as 'created'.
+
+        Parameters
+        ----------
+        geometry : shapely.geometry.MultiPolygon or Polygon
+            The geometry to split.
+
+        Returns
+        -------
+        list of tuple
+            List of (polygon, label) tuples.
+        """
         if isinstance(geometry, MultiPolygon):
             sorted_polygons = sorted(geometry.geoms, key=lambda p: p.area, reverse=True)
             return [(sorted_polygons[0], "оригинал")] + [(poly, "создан") for poly in sorted_polygons[1:]]
         return [(geometry, "оригинал")]
 
     def voronoi_polygons_within_boundaries(self, boundary_polygon, anchor_towns):
-        """Создаёт диаграмму Вороного в пределах границ, а при двух точках использует разрезание."""
+        """
+        Create a Voronoi diagram within the given boundary polygon for anchor towns.
+
+        Parameters
+        ----------
+        boundary_polygon : shapely.geometry.Polygon
+            The boundary polygon.
+        anchor_towns : geopandas.GeoDataFrame
+            GeoDataFrame of anchor towns.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            GeoDataFrame with Voronoi polygons and their sources.
+        """
         
         # Фильтруем точки, оставляя только те, которые внутри границы
         points = [p for p in anchor_towns.geometry if boundary_polygon.contains(p)]
@@ -207,7 +286,21 @@ class AnchorSettlementBuilder(BaseMethod):
         return gpd.GeoDataFrame({'geometry': polygons, 'source': sources}, crs=anchor_towns.crs)
 
     def find_largest_intersection(self, target_poly, gdf):
-        """Находит полигон с наибольшей площадью пересечения с данным."""
+        """
+        Find the polygon in gdf with the largest intersection area with the target polygon.
+
+        Parameters
+        ----------
+        target_poly : shapely.geometry.Polygon
+            The target polygon.
+        gdf : geopandas.GeoDataFrame
+            GeoDataFrame to search for intersections.
+
+        Returns
+        -------
+        tuple
+            (index, geometry) of the polygon with the largest intersection, or (None, None).
+        """
         max_intersection = None
         max_area = 0
         max_index = None
@@ -220,7 +313,19 @@ class AnchorSettlementBuilder(BaseMethod):
         return max_index, max_intersection
 
     def cluster_and_merge_created_polygons(self, created_gdf):
-        """Объединяет все пересекающиеся 'созданные' полигоны в кластеры."""
+        """
+        Cluster and merge all intersecting 'created' polygons.
+
+        Parameters
+        ----------
+        created_gdf : geopandas.GeoDataFrame
+            GeoDataFrame of created polygons.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            GeoDataFrame with merged clusters.
+        """
         merged_polygons = []
         processed = set()
         
@@ -235,8 +340,19 @@ class AnchorSettlementBuilder(BaseMethod):
         return gpd.GeoDataFrame({'geometry': merged_polygons, 'source': 'создан'}, crs=created_gdf.crs)
 
     def merge_created_polygons(self, voronoi_gdf):
-        """Объединяет полигоны 'создан' между собой, а затем с полигоном 'оригинал' с наибольшей площадью пересечения.
-        Если полигон получает статус 'объединён', удаляет оригинал."""
+        """
+        Merge 'created' polygons and then merge with the 'original' polygon with the largest intersection.
+
+        Parameters
+        ----------
+        voronoi_gdf : geopandas.GeoDataFrame
+            GeoDataFrame with Voronoi polygons.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            GeoDataFrame with merged polygons.
+        """
         created_gdf = voronoi_gdf[voronoi_gdf['source'] == "создан"].copy()
         original_gdf = voronoi_gdf[voronoi_gdf['source'] == "оригинал"].copy()
         
@@ -267,7 +383,19 @@ class AnchorSettlementBuilder(BaseMethod):
 
 
     def final_simplification(self, merged_gdf):
-        """Уменьшает геометрию на буфер 30 и объединяет пересекающиеся полигоны в один."""
+        """
+        Shrink geometries by a buffer and merge intersecting polygons into one.
+
+        Parameters
+        ----------
+        merged_gdf : geopandas.GeoDataFrame
+            GeoDataFrame with merged polygons.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            Final simplified GeoDataFrame.
+        """
         shrunk_geometries = merged_gdf.geometry.buffer(-30)
         final_geometry = unary_union(shrunk_geometries)
 
@@ -284,17 +412,21 @@ class AnchorSettlementBuilder(BaseMethod):
 
     def merge_gdfs_excluding_intersections(self, boundaries_gdf, final_gdf, anchor_towns):
         """
-        Объединяет boundaries_gdf и final_gdf, исключая пересекающиеся полигоны, 
-        и для каждого полученного полигона назначает имя из anchor_towns, если внутри него найдена такая точка.
-        В результирующем GeoDataFrame остаются только атрибуты 'geometry' и 'name'.
+        Merge boundaries_gdf and final_gdf, excluding intersecting polygons, and assign names from anchor_towns.
 
-        Parameters:
-        boundaries_gdf (GeoDataFrame): Исходные границы.
-        final_gdf (GeoDataFrame): Итоговые полигоны.
-        anchor_towns (GeoDataFrame): Точки с городами, содержащие атрибут 'name'.
+        Parameters
+        ----------
+        boundaries_gdf : geopandas.GeoDataFrame
+            Initial boundaries GeoDataFrame.
+        final_gdf : geopandas.GeoDataFrame
+            Final polygons GeoDataFrame.
+        anchor_towns : geopandas.GeoDataFrame
+            GeoDataFrame of anchor towns.
 
-        Returns:
-        GeoDataFrame: Объединённый результат с атрибутами 'geometry' и 'name'.
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            Merged GeoDataFrame with 'geometry' and 'anchor_name'.
         """
         
         # Удаляем полигоны из boundaries_gdf, которые пересекаются с final_gdf
@@ -321,14 +453,21 @@ class AnchorSettlementBuilder(BaseMethod):
     
     def get_anchor_settlement_boundaries(self, towns, update_df: pd.DataFrame | None = None,  time: int = 50):
         """
-        The main function that orchestrates the creation, merging, and finalization of anchor settlement boundaries.
-        
-        Parameters:
-        - towns: GeoDataFrame of towns.
-        - update_df: Optional DataFrame for updates.
-        
-        Returns:
-        - A GeoDataFrame with finalized anchor settlement boundaries.
+        Main function to orchestrate the creation, merging, and finalization of anchor settlement boundaries.
+
+        Parameters
+        ----------
+        towns : geopandas.GeoDataFrame
+            GeoDataFrame of towns.
+        update_df : pandas.DataFrame or None, optional
+            Optional DataFrame for updates.
+        time : int, optional
+            Maximum travel time. Default is 50.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            GeoDataFrame with finalized anchor settlement boundaries.
         """
         if update_df is not None:
             towns = self.region.get_update_towns_gdf(update_df)
