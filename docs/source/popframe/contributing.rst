@@ -1,108 +1,57 @@
-Contributing
-============
+Contributing / Вклад в проект
+============================
 
-We welcome you to `check the existing
-issues <https://github.com/aimclub/blocksnet/issues>`__ for bugs or
-enhancements to work on. If you have an idea for an extension to BlocksNet,
-please `file a new
-issue <https://github.com/aimclub/blocksnet/issues/new>`__ so we can
-discuss it.
+**EN:**
+We welcome your contributions to PopFrame! Please check the existing issues for bugs or enhancements to work on. If you have an idea for an extension, file a new issue so we can discuss it. Familiarize yourself with the project layout before making major contributions.
 
-Make sure to familiarize yourself with the project layout before making
-any major contributions.
+**RU:**
+Мы приветствуем ваш вклад в PopFrame! Ознакомьтесь с существующими задачами (issues) для поиска багов или улучшений. Если у вас есть идея для расширения, создайте новую задачу для обсуждения. Перед крупными изменениями ознакомьтесь со структурой проекта.
 
-.. How to contribute
-.. -----------------
+How to contribute / Как внести вклад
+------------------------------------
 
-.. .. include:: ../../../README.rst
-..    :start-after: .. developing-start
-..    :end-before: .. developing-end
+.. include:: ../../../README.rst
+   :start-after: .. developing-start
+   :end-before: .. developing-end
 
-(If it looks confusing to you, then look up the `Git
-documentation <http://git-scm.com/documentation>`__ on the web.)
+Before submitting your pull request / Перед отправкой pull request
+-----------------------------------------------------------------
 
-Before submitting your pull request
------------------------------------
+**EN:**
+- Update the documentation and README if your changes affect them.
+- Update or add tests for your code.
+- Make sure your code is properly commented and documented.
+- If you add dependencies, ensure they are easy to install via pip and support Python 3.
 
-Before you submit a pull request for your contribution, please work
-through this checklist to make sure that you have done everything
-necessary so we can efficiently review and accept your changes.
+**RU:**
+- Обновите документацию и README, если ваши изменения их затрагивают.
+- Добавьте или обновите тесты для вашего кода.
+- Убедитесь, что код снабжён комментариями и docstring.
+- Новые зависимости должны легко устанавливаться через pip и поддерживать Python 3.
 
-If your contribution changes BlocksNet in any way:
+Contribute to the documentation / Вклад в документацию
+------------------------------------------------------
 
--  Update the
-   `documentation <https://github.com/aimclub/blocksnet/tree/main/docs>`__
-   so all of your changes are reflected there.
+**EN:**
+All documentation is created with Sphinx autodoc. Use .. automodule:: <module_name> for module documentation. Add new files to the toctree in api/index.rst.
 
--  Update the
-   `README <https://github.com/aimclub/blocksnet/blob/main/README.md>`__
-   if anything there has changed.
+**RU:**
+Вся документация создаётся с помощью Sphinx autodoc. Для описания модулей используйте .. automodule:: <module_name>. Новые файлы добавляйте в toctree в api/index.rst.
 
-If your contribution involves any code changes:
+After submitting your pull request / После отправки pull request
+---------------------------------------------------------------
 
--  Update the `project unit` tests to test your code changes.
+**EN:**
+- Automated tests and code quality checks will run.
+- Address any errors if checks fail.
 
--  Make sure that your code is properly commented with
-   `docstrings <https://www.python.org/dev/peps/pep-0257/>`__ and
-   comments explaining your rationale behind non-obvious coding
-   practices.
+**RU:**
+- Будут запущены автоматические тесты и проверки качества кода.
+- Исправьте ошибки, если проверки не пройдены.
 
-If your contribution requires a new library dependency:
+Acknowledgements / Благодарности
+--------------------------------
 
--  Double-check that the new dependency is easy to install via ``pip``
-   or Anaconda and supports Python 3. If the dependency requires a
-   complicated installation, then we most likely won't merge your
-   changes because we want to keep BlocksNet easy to install.
+This guide is based on the TPOT Framework contribution guide.
 
-Contribute to the documentation
--------------------------------
-Take care of the documentation.
-
-All the documentation is created with the Sphinx autodoc feature. Use ..
-automodule:: <module_name> section which describes all the code in the module.
-
--  If a new package with several scripts:
-
-   1. Go to `docs/source/BlocksNet <https://github.com/aimclub/blocksnet/tree/master/docs>`__ and create new  ``your_name_for_file.rst`` file.
-
-   2. Add a Header underlined with “=” sign. It’s crucial.
-
-   .. 3. Add automodule description for each of your scripts. ::
-
-   ..     .. automodule:: blocksnet.your.first.script.path
-
-   ..     .. automodule:: blocksnet.your.second.script.path
-   ..     ...
-
-   4. Add your_name_for_file to the toctree at ``docs/source/blocksnet/api/index.rst``
-
--  If a new module to the existed package:
-
-    Most of the sections are already described in `docs/source/BlocksNet <https://github.com/aimclub/blocksnet/tree/master/docs>`__ , so you can:
-
-   -  choose the most appropriate and repeat 3-d step from the previous section.
-   -  or create a new one and repeat 2-3 steps from the previous section.
-
--  If a new function or a class to the existing module:
-
-    Be happy. Everything is already done for you.
-
-After submitting your pull request
-----------------------------------
-
-After submitting your pull request,
-`Travis-CI <https://travis-ci.com/>`__ will automatically run unit tests
-on your changes and make sure that your updated code builds and runs on
-Python 3. We also use services that automatically check code quality and
-test coverage.
-
-Check back shortly after submitting your pull request to make sure that
-your code passes these checks. If any of the checks come back with a red
-X, then do your best to address the errors.
-
-Acknowledgements
-----------------
-
-This document guide is based at well-written `TPOT Framework
-contribution
-guide <https://github.com/EpistasisLab/tpot/blob/master/docs_sources/contributing.md>`__.
+Данный гайд основан на руководстве по вкладу в TPOT Framework.

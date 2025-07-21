@@ -14,7 +14,7 @@ class SpatialInequalityCalculator(BaseMethod):
         self,
         gdf_cities: gpd.GeoDataFrame,
         gdf_polygons: gpd.GeoDataFrame,
-        inequality_keyword: str = "Неравенство"
+        inequality_keyword: str = "Нерaвенство"
     ) -> Tuple[gpd.GeoDataFrame, Dict[str, Dict[str, float]]]:
         """
         Transfer all columns containing inequality metrics from points (cities) to polygons (agglomerations)
@@ -27,7 +27,7 @@ class SpatialInequalityCalculator(BaseMethod):
         gdf_polygons : geopandas.GeoDataFrame
             GeoDataFrame with polygons (agglomerations).
         inequality_keyword : str, optional
-            Keyword to identify inequality metric columns. Default is "Неравенство".
+            Keyword to identify inequality metric columns. Default is "Нерaвенство".
 
         Returns
         -------

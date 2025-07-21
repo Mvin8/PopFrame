@@ -1,5 +1,5 @@
 PopFrame
-==========
+========
 
 .. logo-start
 
@@ -12,188 +12,243 @@ PopFrame
 
 .. description-start
 
-**PopFrame** is an open source library that includes methods for modeling the framework of a regional-level settlement system for assessing territories subject to reclamation/renovation, as well as modeling scenarios for changing regional facilities. The library is designed to form a universal information model of the region based on localities. 
+**EN:**
+PopFrame is an open source library for modeling regional settlement systems and territory assessment. It provides tools for building a universal information model of a region based on localities, as well as for scenario modeling and analysis.
+
+**RU:**
+PopFrame — это open source библиотека для моделирования каркаса расселения и оценки территорий. Она предоставляет инструменты для построения универсальной информационной модели региона на основе населённых пунктов, а также для сценарного моделирования и анализа.
 
 .. description-end
 
-Table of Contents
---------------------
+Table of Contents / Содержание
+-----------------------------
 
-- `Core features <Core features_>`_
-- `Installation <Installation_>`_
-- `Examples <Examples_>`_
-- `Project Structure <Project Structure_>`_
-- `Documentation <Documentation_>`_
-- `Developing <Developing_>`_
-- `License <License_>`_
-- `Acknowledgments <Acknowledgments_>`_
-- `Contacts <Contacts_>`_
+- `Core features <#core-features>`_
+- `Installation <#installation>`_
+- `Examples <#examples>`_
+- `Project Structure <#project-structure>`_
+- `Documentation <#documentation>`_
+- `Developing <#developing>`_
+- `License <#license>`_
+- `Acknowledgments <#acknowledgments>`_
+- `Contacts <#contacts>`_
 
-Core features
--------------
+Core features / Основные возможности
+-----------------------------------
 
 .. features-start
 
-The library also provides tools for working with the information model of the region, which allow:
+**EN:**
+- Calculate indicators (population, birth rate, mortality) by municipal districts and municipalities.
+- Evaluate territories in relation to the settlement system framework.
+- Calculate the level of urbanization of the territory.
+- Build agglomerations based on the settlement system framework.
 
--  Calculate indicators (population, birth rate, mortality) by municipal districts and municipalities.
--  Evaluate territories in relation to the framework of the settlement system.
--  Calculating the level of urbanization of the territory.
--  The construction of agglomerations based on the framework of the settlement system
+**RU:**
+- Расчёт показателей (население, рождаемость, смертность) по муниципальным районам и муниципалитетам.
+- Оценка территорий относительно каркаса расселения.
+- Расчёт уровня урбанизации территории.
+- Построение агломераций на основе каркаса расселения.
 
 .. features-end
 
-Installation
-------------
+Installation / Установка
+-----------------------
 
 .. installation-start
 
-**PopFrame** can be installed with ``pip``:
+**EN:**
+PopFrame can be installed with ``pip``:
 
 ::
+   pip install popframe
 
+**RU:**
+Установить PopFrame можно через ``pip``:
+
+::
    pip install popframe
 
 .. installation-end
 
-Examples
-------------
-Describe examples how it should work and should be used.
-Images, GIFs and code cells are welcome.
+Examples / Примеры
+------------------
 
+**EN:**
+Below are examples for the main modules of PopFrame.
 
-Project Structure
------------------
+**RU:**
+Ниже приведены примеры для основных модулей PopFrame.
 
-The latest version of the library is available in the ``main`` branch.
+**1. Region (models):**
+```python
+from popframe.models.region import Region
+region = Region.from_pickle('data/region.pickle')
+print(region.towns)
+```
 
-The repository includes the following directories and modules:
+**2. PopulationFrame (method):**
+```python
+from popframe.method.popuation_frame import PopulationFrame
+frame = PopulationFrame(region=region)
+gdf = frame.build_circle_frame()
+gdf.plot()
+```
 
--  `popframe <https://github.com/Mvin8/PopFrame/tree/main?tab=readme-ov-file>`__
-   - directory with the library code:
+**3. AgglomerationBuilder (method):**
+```python
+from popframe.method.aglomeration import AgglomerationBuilder
+builder = AgglomerationBuilder(region=region)
+agglos = builder.get_agglomerations(time=80)
+agglos.plot()
+```
 
-   -  preprocessing - data preprocessing module
-   -  models - entities' classes used in library
-   -  method - library tool methods based on ``Region`` model
-   -  utils - module containing utulity functions and consts
+**4. CityPopulationScorer (method):**
+```python
+from popframe.method.city_evaluation import CityPopulationScorer
+scorer = CityPopulationScorer(gdf_mo, gdf_hex)
+results = scorer.run()
+```
 
--  `tests <https://github.com/Mvin8/PopFrame/tree/main/tests>`__
-   ``pytest`` testing
--  `examples <https://github.com/Mvin8/PopFrame/tree/main/examples>`__
-   examples of how methods work
--  `docs <https://github.com/Mvin8/PopFrame/tree/main/docs>`__ -
-   documentation sources
+**5. InfrastructureAnalyzer (method):**
+```python
+from popframe.method.engineer import InfrastructureAnalyzer
+analyzer = InfrastructureAnalyzer(infrastructure_gdf, assessment_areas_gdf)
+results = analyzer.get_results()
+```
 
+**6. LevelFiller (preprocessing):**
+```python
+from popframe.preprocessing.level_filler import LevelFiller
+filler = LevelFiller(towns=gdf_towns)
+leveled = filler.fill_levels()
+```
 
-Documentation
--------------
+**7. PopulationFiller (preprocessing):**
+```python
+from popframe.preprocessing.population_filler import PopulationFiller
+filler = PopulationFiller(units=gdf_units, towns=gdf_towns, adjacency_matrix=adj_matrix)
+filled = filler.fill()
+```
 
-Detailed information and description of BlocksNet is available in
-`documentation <https://mvin8.github.io/PopFrame/>`__.
+**8. Utils (const):**
+```python
+from popframe.utils.const import *
+# Используйте константы для настройки методов
+```
 
+See more examples in the `examples/` directory and documentation.
+Больше примеров — в папке `examples/` и в документации.
 
-Developing
-----------
+Project Structure / Структура проекта
+------------------------------------
+
+**EN:**
+- ``popframe`` — library code:
+  - ``preprocessing`` — data preprocessing
+  - ``models`` — core data models
+  - ``method`` — analytical methods
+  - ``utils`` — utility functions and constants
+- ``examples`` — usage examples
+- ``docs`` — documentation sources
+
+**RU:**
+- ``popframe`` — код библиотеки:
+  - ``preprocessing`` — предобработка данных
+  - ``models`` — основные модели данных
+  - ``method`` — аналитические методы
+  - ``utils`` — утилиты и константы
+- ``examples`` — примеры использования
+- ``docs`` — исходники документации
+
+Documentation / Документация
+----------------------------
+
+**EN:**
+Full documentation is available at: https://mvin8.github.io/PopFrame/
+
+**RU:**
+Полная документация: https://mvin8.github.io/PopFrame/
+
+Developing / Разработка
+----------------------
 
 .. developing-start
 
-To start developing the library, one must perform following actions:
-
+**EN:**
+To start developing PopFrame:
 1. Clone the repository:
    ::
-
        $ git clone https://github.com/Mvin8/PopFrame
-
-2. (Optional) Create a virtual environment as the library demands exact package versions:
+2. (Optional) Create a virtual environment:
    ::
-
        $ make venv
-
-   Activate the virtual environment if you created one:
-   ::
-
        $ source .venv/bin/activate
-
 3. Install the library in editable mode with development dependencies:
    ::
-
        $ make install-dev
-
 4. Install pre-commit hooks:
    ::
-
        $ pre-commit install
-
-5. Create a new branch based on ``develop``:
+5. Create a new branch:
    ::
-
        $ git checkout -b develop <new_branch_name>
-
-6. Start making changes on your newly created branch, remembering to
-   never work on the ``master`` branch! Work on this copy on your
-   computer using Git to do the version control.
-
-7. Update
-   `tests <https://github.com/Mvin8/PopFrame/tree/main/tests>`__
-   according to your changes and run the following command:
-
+6. Make changes, update tests and documentation, and run:
    ::
+       $ make test
+7. Commit and push your changes, then open a Pull Request.
 
-         $ make test
-
-   Make sure that all tests pass.
-
-8. Update the
-   `documentation <https://github.com/Mvin8/PopFrame/tree/main/docs>`__
-   and **README** according to your changes.
-
-11. When you're done editing and local testing, run:
-
+**RU:**
+Для начала разработки PopFrame:
+1. Клонируйте репозиторий:
    ::
-
-         $ git add modified_files
-         $ git commit
-
-   to record your changes in Git, then push them to GitHub with:
-
+       $ git clone https://github.com/Mvin8/PopFrame
+2. (Опционально) создайте виртуальное окружение:
    ::
-
-            $ git push -u origin my-contribution
-
-   Finally, go to the web page of your fork of the BlocksNet repo, and click
-   'Pull Request' (PR) to send your changes to the maintainers for review.
+       $ make venv
+       $ source .venv/bin/activate
+3. Установите библиотеку в editable-режиме с dev-зависимостями:
+   ::
+       $ make install-dev
+4. Установите pre-commit хуки:
+   ::
+       $ pre-commit install
+5. Создайте новую ветку:
+   ::
+       $ git checkout -b develop <new_branch_name>
+6. Вносите изменения, обновляйте тесты и документацию, запускайте:
+   ::
+       $ make test
+7. Зафиксируйте и отправьте изменения, откройте Pull Request.
 
 .. developing-end
 
-Check out the...
+License / Лицензия
+------------------
 
+BSD-3-Clause license. See LICENSE file.
 
-License
--------
-
-The project has `BSD-3-Clause license <./LICENSE>`__
-
-Acknowledgments
----------------
+Acknowledgments / Благодарности
+-------------------------------
 
 .. acknowledgments-start
 
-The library was developed as the main part of the ITMO University
-project...
+**EN:**
+PopFrame was developed as part of the ITMO University project.
 
+**RU:**
+PopFrame разработан в рамках проекта Университета ИТМО.
 
-Contacts
---------
+.. acknowledgments-end
+
+Contacts / Контакты
+-------------------
 
 .. contacts-start
 
-You can contact us:
-
--  `NCCR <https://actcognitive.org/o-tsentre/kontakty>`__ - National
-   Center for Cognitive Research
--  `IDU <https://idu.itmo.ru/en/contacts/contacts.htm>`__ - Institute of
-   Design and Urban Studies
--  `Maksim Natykin <https://t.me/Mvin98>`__ - lead software engineer
+- `NCCR <https://actcognitive.org/o-tsentre/kontakty>`__ — National Center for Cognitive Research
+- `IDU <https://idu.itmo.ru/en/contacts/contacts.htm>`__ — Institute of Design and Urban Studies
+- `Maksim Natykin <https://t.me/Mvin98>`__ — lead software engineer
 
 .. contacts-end
 
