@@ -1,7 +1,7 @@
-popframe.method.popuation\_frame
+popframe.method.population_frame
 ================================
 
-.. automodule:: popframe.method.popuation_frame
+.. automodule:: popframe.method.population_frame
 
    
    

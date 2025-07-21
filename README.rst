@@ -89,7 +89,7 @@ print(region.towns)
 
 **2. PopulationFrame (method):**
 ```python
-from popframe.method.popuation_frame import PopulationFrame
+from popframe.method.population_frame import PopulationFrame
 frame = PopulationFrame(region=region)
 gdf = frame.build_circle_frame()
 gdf.plot()
@@ -97,7 +97,7 @@ gdf.plot()
 
 **3. AgglomerationBuilder (method):**
 ```python
-from popframe.method.aglomeration import AgglomerationBuilder
+from popframe.method.agglomeration import AgglomerationBuilder
 builder = AgglomerationBuilder(region=region)
 agglos = builder.get_agglomerations(time=80)
 agglos.plot()

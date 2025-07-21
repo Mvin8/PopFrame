@@ -1,7 +1,7 @@
-popframe.method.aglomeration
+popframe.method.agglomeration
 ============================
 
-.. automodule:: popframe.method.aglomeration
+.. automodule:: popframe.method.agglomeration
 
    
    

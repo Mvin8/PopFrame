@@ -6,8 +6,8 @@ Examples
 .. toctree::
    :maxdepth: 1
 
-   Построение границ агломераций <aglomeration>
-   Построени границ опорных населенных пунктов <anchor_settelment>
+   Построение границ агломераций <agglomeration>
+   Построение границ опорных населённых пунктов <anchor_settlement>
    Оценка критериев для гексагональной сетки <criterion_hex>
    Оценка инженерной инфраструктуры <engineer>
    Оценка землепользования <land_use_assessment>
