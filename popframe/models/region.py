@@ -6,12 +6,9 @@ import pandas as pd
 from .town import Town
 import matplotlib.pyplot as plt
 from popframe.preprocessing.level_filler import LevelFiller
+from popframe.utils.validators import RegionValidator
+from popframe.config.constants import VISUALIZATION_COLORS
 
-
-DISTRICTS_PLOT_COLOR = '#28486d'
-SETTLEMENTS_PLOT_COLOR = '#ddd'
-TOWNS_PLOT_COLOR = '#333333'
-TERRITORIES_PLOT_COLOR = '#893434'
 
 class Region():
     """
@@ -50,25 +47,20 @@ class Region():
         ----------
         region : gpd.GeoDataFrame
             GeoDataFrame representing the boundaries of the region.
-        districts : gpd.GeoDataFrame
-            GeoDataFrame containing information about districts.
-        settlements : gpd.GeoDataFrame
-            GeoDataFrame containing information about settlements.
         towns : gpd.GeoDataFrame
             GeoDataFrame containing information about towns.
         accessibility_matrix : pd.DataFrame
             DataFrame containing accessibility data between towns.
-        territories : gpd.GeoDataFrame, optional
-            GeoDataFrame containing information about territories (default is None).
 
         Raises
         ------
         AssertionError
             If the CRS or indices between the towns and the accessibility matrix do not match.
         """
-        region = self.validate_region(region)
-        towns = self.validate_towns(towns)
-        accessibility_matrix = self.validate_accessibility_matrix(accessibility_matrix)
+        # Используем новые валидаторы
+        region = RegionValidator.validate_region_gdf(region)
+        towns = RegionValidator.validate_towns_gdf(towns)
+        accessibility_matrix = RegionValidator.validate_accessibility_matrix(accessibility_matrix, towns)
 
         assert (accessibility_matrix.index == towns.index).all(), "Accessibility matrix indices and towns indices don't match"
         assert region.crs == towns.crs, 'CRS should match everywhere'
@@ -83,29 +75,50 @@ class Region():
     def validate_towns(gdf : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """
         Validates the towns GeoDataFrame.
+        
+        Deprecated: Use RegionValidator.validate_towns_gdf instead
         """
-        assert isinstance(gdf, gpd.GeoDataFrame), 'Towns should be instance of gpd.GeoDataFrame'
-        return gdf
+        import warnings
+        warnings.warn(
+            "validate_towns is deprecated. Use RegionValidator.validate_towns_gdf instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return RegionValidator.validate_towns_gdf(gdf)
 
     @staticmethod
     def validate_region(gdf : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """
         Validates the region GeoDataFrame to ensure it has the correct structure and data types.
+        
+        Deprecated: Use RegionValidator.validate_region_gdf instead
         """
-        assert isinstance(gdf, gpd.GeoDataFrame), 'Region should be instance of gpd.GeoDataFrame'
-        assert gdf.geom_type.isin(['Polygon', 'MultiPolygon']).all(), 'District geometry should be Polygon or MultiPolygon'
-        return gdf[['geometry']]
+        import warnings
+        warnings.warn(
+            "validate_region is deprecated. Use RegionValidator.validate_region_gdf instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return RegionValidator.validate_region_gdf(gdf)
     
     @staticmethod
     def validate_accessibility_matrix(df : pd.DataFrame) -> pd.DataFrame:
         """
         Validates the accessibility matrix, ensuring it has non-negative float values 
         and matching row and column indices.
+        
+        Deprecated: Use RegionValidator.validate_accessibility_matrix instead
         """
-        assert pd.api.types.is_float_dtype(df.values), 'Accessibility matrix values should be float'
-        assert (df.values>=0).all(), 'Accessibility matrix values should be greater or equal 0'
-        assert (df.index == df.columns).all(), "Accessibility matrix indices and columns don't match"
-        return df
+        import warnings
+        warnings.warn(
+            "validate_accessibility_matrix is deprecated. Use RegionValidator.validate_accessibility_matrix instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        # Нужно создать фиктивный towns GDF для совместимости
+        towns_index = pd.Index(df.index)
+        fake_towns = gpd.GeoDataFrame(index=towns_index)
+        return RegionValidator.validate_accessibility_matrix(df, fake_towns)
 
     @property
     def towns(self) -> list[Town]:
@@ -117,9 +130,22 @@ class Region():
         list[Town]
             List of Town objects.
         """
-        return self._towns.values()
+        return list(self._towns.values())
     
     def get_update_towns_gdf(self, update_df: pd.DataFrame | None = None):
+        """
+        Get updated towns GeoDataFrame with optional population updates
+        
+        Parameters
+        ----------
+        update_df : pd.DataFrame, optional
+            DataFrame with population updates
+            
+        Returns
+        -------
+        gpd.GeoDataFrame
+            Updated towns GeoDataFrame
+        """
         gdf = self.get_towns_gdf()
         if update_df is not None:
             # Обновляем значения населения в gdf из update_df
@@ -193,7 +219,6 @@ class Region():
         Region
             The loaded Region object.
         """
-        state = None
         with open(file_path, "rb") as f:
             state = pickle.load(f)
         return state

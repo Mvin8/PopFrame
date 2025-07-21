@@ -4,54 +4,58 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "popframe"
-version = "0.1"
+version = "0.1.0"
 authors = [
-    # { name = "", email = "" }, # TODO add authors
+    { name = "IDU ITMO Team", email = "contact@idu.itmo.ru" },
 ]
-description = "Provision assessment for cities of an urban region"
+description = "Библиотека для моделирования каркаса расселения и оценки территорий"
 readme = "README.rst"
 requires-python = ">=3.10"
-license = { file = "LICENCE.md" }
+license = { file = "LICENSE" }
 
 dependencies = [
-    "geopandas==1.0.1",
-    "retrying==1.3.4",
-    "contextily",
-    "mapclassify==2.6.1",
-    "matplotlib==3.7.1",
-    "matplotlib-inline==0.1.6",
-    "networkx==3.1",
-    "numpy==1.23.5",
-    "osmnx==1.6.0",
-    "pandas==1.5.3",
-    "pyarrow==12.0.0",
-    "pydantic==2.7.2",
-    "pylint==2.17.4",
-    "requests==2.31.0",
-    "scikit-learn==1.2.2",
-    "scipy==1.10.1",
-    "shapely==2.0.1",
-    "six==1.16.0",
-    "tqdm==4.65.0",
-    "seaborn==0.12.2",
-    "folium==0.14.0",
-    "dill==0.3.8", 
-    "python-louvain",
-    "geovoronoi"
-    
-
+    "geopandas>=1.0.1,<2.0",
+    "retrying>=1.3.0,<2.0",
+    "contextily>=1.3.0,<2.0",
+    "mapclassify>=2.6.0,<3.0",
+    "matplotlib>=3.7.0,<4.0",
+    "matplotlib-inline>=0.1.0,<1.0",
+    "networkx>=3.1,<4.0",
+    "numpy>=1.23.0,<2.0",
+    "osmnx>=1.6.0,<2.0",
+    "pandas>=1.5.0,<3.0",
+    "pyarrow>=12.0.0,<16.0",
+    "pydantic>=2.7.0,<3.0",
+    "requests>=2.31.0,<3.0",
+    "scikit-learn>=1.2.0,<2.0",
+    "scipy>=1.10.0,<2.0",
+    "shapely>=2.0.0,<3.0",
+    "six>=1.16.0,<2.0",
+    "tqdm>=4.65.0,<5.0",
+    "seaborn>=0.12.0,<1.0",
+    "folium>=0.14.0,<1.0",
+    "dill>=0.3.8,<1.0", 
+    "python-louvain>=0.16,<1.0",
+    "geovoronoi>=0.4.0,<1.0"
 ]
 
 classifiers = [
+    "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Scientific/Engineering :: Visualization",
 ]
+
+keywords = ["gis", "urban-planning", "settlement-system", "agglomeration", "spatial-analysis"]
 
 [tool.setuptools.packages.find]
 include = ["popframe*"]
-
 
 [project.optional-dependencies]
 dev = [
@@ -59,28 +63,53 @@ dev = [
     "isort>=5.6",
     "pylint>=2.17",
     "pre-commit>=3.1",
-    "pytest==7.4.3",
-    "pytest-cov==4.1.0",
-    "sphinx==6.2.1",
-    "sphinx-book-theme==1.0.1",
-    "nbsphinx==0.9.3",
-    "nbsphinx-link==1.3.0",
-    "numpydoc==1.5.0",
-    "autodocsumm==0.2.12",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+]
+
+docs = [
+    "sphinx>=6.2.0",
+    "sphinx-book-theme>=1.0.0",
+    "nbsphinx>=0.9.0",
+    "nbsphinx-link>=1.3.0",
+    "numpydoc>=1.5.0",
+    "autodocsumm>=0.2.12",
     "myst_parser>=3.0.0,<4.0.0",
     "sphinx_rtd_theme>=1.2.0,<2.0.0",
     "pandoc>=2.0.0,<3.0.0",
 ]
 
+visualization = [
+    "plotly>=5.0.0,<6.0",
+    "bokeh>=3.0.0,<4.0",
+    "altair>=5.0.0,<6.0",
+]
 
 [project.urls]
+"Homepage" = "https://github.com/Mvin8/PopFrame/"
 "Repository" = "https://github.com/Mvin8/PopFrame/"
 "Bug Tracker" = "https://github.com/Mvin8/PopFrame/issues"
-
+"Documentation" = "https://mvin8.github.io/PopFrame/"
+"Changelog" = "https://github.com/Mvin8/PopFrame/blob/main/CHANGELOG.md"
 
 [tool.black]
 line-length = 120
 target-version = ['py310']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
 
 [tool.pylint.format]
 max-line-length = 120
@@ -89,12 +118,57 @@ expected-line-ending-format = "LF"
 [tool.pylint.main]
 extension-pkg-allow-list = ["pydantic"]
 
+[tool.pylint.messages_control]
+disable = [
+    "too-few-public-methods",
+    "too-many-arguments", 
+    "too-many-instance-attributes",
+    "import-outside-toplevel",
+]
+
 [tool.pycodestyle]
 max-line-length = 120
 
-
 [tool.isort]
+profile = "black"
 lines_after_imports = 2
 multi_line_output = 3
 line_length = 120
 include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=popframe",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["popframe"]
+omit = [
+    "tests/*",
+    "popframe/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

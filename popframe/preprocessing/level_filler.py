@@ -1,27 +1,35 @@
-import geopandas as gpd
-from pydantic import BaseModel, Field, field_validator
-from shapely.geometry import Point
+"""
+Level filling utilities for PopFrame
+"""
+
 from typing import ClassVar
-from ..models.geodataframe import GeoDataFrame, BaseRow
+from pydantic import BaseModel, Field, field_validator
+
+from ..models.geodataframe import BaseRow, GeoDataFrame
+from ..config.constants import PopulationThresholds
 
 
 class TownRow(BaseRow):
     """
-    A model representing a town's data row in a GeoDataFrame.
+    A data class representing a town row with ID, name, population, and level.
 
     Attributes
     ----------
-    geometry : shapely.geometry.Point
-        The geographic location of the town.
+    id : int
+        Unique identifier for the town.
     name : str
-        The name of the town.
+        Name of the town.
     population : int
-        The population of the town. Must be greater than zero.
-    level : str, optional
-        The administrative level of the town, defaults to "Нет уровня" (no level).
+        Population of the town. Must be greater than zero.
+    level : str
+        Administrative level of the town. Defaults to "Нет уровня".
+
+    Methods
+    -------
+    None
     """
+
     id: int
-    geometry: Point
     name: str
     population: int = Field(gt=0)
     level: str = Field(default="Нет уровня")
@@ -35,8 +43,8 @@ class LevelFiller(BaseModel):
     ----------
     towns : GeoDataFrame[TownRow]
         A GeoDataFrame containing town data that includes name, population, and level.
-    population_thresholds : dict
-        A class-level attribute defining population ranges for different administrative levels.
+    population_thresholds : PopulationThresholds
+        Configuration object defining population ranges for different administrative levels.
 
     Methods
     -------
@@ -51,69 +59,66 @@ class LevelFiller(BaseModel):
     """
 
     towns: GeoDataFrame[TownRow]
-    population_thresholds: ClassVar[dict[str, tuple[int, int]]] = {
-        "Сверхкрупный город": (3000000, float('inf')),
-        "Крупнейший город": (1000000, 3000000),
-        "Крупный город": (250000, 1000000),
-        "Большой город": (100000, 250000),
-        "Средний город": (50000, 100000),
-        "Малый город": (5000, 50000),
-        "Крупное сельское поселение": (3000, 5000),
-        "Большое сельское поселение": (1000, 3000),
-        "Среднее сельское поселение": (200, 1000),
-        "Малое сельское поселение": (0, 200),
-    }
+    population_thresholds: PopulationThresholds = Field(default_factory=PopulationThresholds)
+
+    @field_validator("towns", mode="before")
+    def validate_towns(cls, gdf):
+        """
+        Validates the towns GeoDataFrame and assigns levels based on population.
+        
+        Parameters
+        ----------
+        gdf : GeoDataFrame
+            The input GeoDataFrame to validate
+            
+        Returns
+        -------
+        GeoDataFrame
+            The validated and processed GeoDataFrame
+        """
+        if not isinstance(gdf, GeoDataFrame[TownRow]):
+            gdf = GeoDataFrame[TownRow](gdf)
+            
+        # Assign levels based on population
+        thresholds = PopulationThresholds()
+        gdf['level'] = gdf.apply(lambda row: cls._assign_level(row, thresholds), axis=1)
+        
+        return gdf
 
     @staticmethod
-    def _assign_level(row) -> str:
+    def _assign_level(row, thresholds: PopulationThresholds) -> str:
         """
-        Assigns a level to a town based on its population.
+        Assigns the administrative level based on population thresholds.
 
         Parameters
         ----------
-        row : pd.Series
-            A row from the GeoDataFrame containing town data.
+        row : pandas.Series
+            A row from the towns GeoDataFrame containing population data.
+        thresholds : PopulationThresholds
+            Configuration object with population thresholds
 
         Returns
         -------
         str
-            The administrative level of the town.
+            The administrative level corresponding to the population.
         """
-        population = row['population']
+        population = row.get('population', 0)
         
-        for level, (lower_bound, upper_bound) in LevelFiller.population_thresholds.items():
-            if lower_bound < population <= upper_bound:
+        for level, (min_pop, max_pop) in thresholds.THRESHOLDS.items():
+            if min_pop <= population < max_pop:
                 return level
-        return "Неизвестный уровень"  # If the population does not fit in any of the ranges
-
-    @field_validator("towns", mode="before")
-    @classmethod
-    def validate_towns(cls, gdf):
-        """
-        Validates and assigns levels to towns in the provided GeoDataFrame.
-
-        Parameters
-        ----------
-        gdf : GeoDataFrame
-            A GeoDataFrame containing town data.
-
-        Returns
-        -------
-        GeoDataFrame[TownRow]
-            A validated GeoDataFrame with assigned administrative levels.
-        """
-        gdf["id"] = gdf.index
-        gdf["level"] = gdf.apply(cls._assign_level, axis=1)
-        return GeoDataFrame[TownRow](gdf)
+                
+        return "Нет уровня"
 
     def fill_levels(self) -> GeoDataFrame[TownRow]:
         """
-        Fills in the administrative levels for the towns based on their population.
+        Fills in the administrative levels for all towns in the GeoDataFrame based on their population.
 
         Returns
         -------
         GeoDataFrame[TownRow]
-            An updated GeoDataFrame with filled levels for each town.
+            The GeoDataFrame with updated administrative levels.
         """
+        # Levels are already assigned in the validator, so we just return the towns
         return self.towns
 
