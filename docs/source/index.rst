@@ -1,16 +1,14 @@
-Welcome to PopFrame documentation!
+Welcome to PopFrame documentation! / Добро пожаловать в документацию PopFrame!
 ===================================
 
-.. .. include:: ../../README.rst
-..    :start-after: .. logo-start
-..    :end-before: .. logo-end
+**EN:**
+This documentation covers the main features, API, and usage examples of PopFrame.
 
-.. .. include:: ../../README.rst
-..    :start-after: .. description-start
-..    :end-before: .. description-end
+**RU:**
+В этой документации представлены основные возможности, API и примеры использования PopFrame.
 
-Documentation:
---------------
+Documentation / Документация:
+-----------------------------
 
 .. toctree::
    :maxdepth: 2
@@ -20,16 +18,17 @@ Documentation:
    api/index
    about_us
 
-Features:
----------
+Sections / Разделы:
+-------------------
 
-.. .. include:: ../../README.rst
-..    :start-after: .. features-start
-..    :end-before: .. features-end
+- **popframe** — EN: Library modules overview. RU: Обзор модулей библиотеки.
+- **examples** — EN: Usage examples. RU: Примеры использования.
+- **api** — EN: API reference. RU: Справочник по API.
+- **about_us** — EN: About the team. RU: О команде.
 
-Acknowledgements
-----------------
+Acknowledgements / Благодарности
+-------------------------------
 
-.. .. include:: ../../README.rst
-..    :start-after: .. acknowledgments-start
-..    :end-before: .. acknowledgments-end
+.. include:: ../../README.rst
+   :start-after: .. acknowledgments-start
+   :end-before: .. acknowledgments-end

@@ -1,26 +1,23 @@
-About us
-========
+About us / О нас
+================
 
-.. .. image:: ../img/idu.jpg
-..    :alt: IDU team
+**EN:**
+PopFrame is developed and maintained by the `IDU <https://idu.itmo.ru/>`__ team at ITMO University. The Institute of Design and Urban Studies (IDU) is an educational and research unit focused on interdisciplinary competencies and scientific approaches to solving complex urban problems using IT, sustainability, and social orientation principles.
 
-The BlocksNet is developed and maintained by the `IDU <https://idu.itmo.ru/>`__ team.
+**RU:**
+PopFrame разрабатывается и поддерживается командой `IDU <https://idu.itmo.ru/>`__ (Институт дизайна и урбанистики ИТМО). IDU — это образовательное и проектно-исследовательское подразделение, развивающее междисциплинарные компетенции и научные подходы к решению сложных городских задач с помощью ИТ, принципов устойчивого развития и социальной ориентированности.
 
-The Institute of Design and Urban Studies (IDU) is an educational and project-research
-unit of ITMO University aimed at developing interdisciplinary competencies and scientific
-approach for solving complex urban problems using information technologies based on the
-principles of sustainability and social orientation.
+.. image:: ../img/idu.jpg
+   :alt: IDU team
 
-Contacts
---------
+Contacts / Контакты
+-------------------
 
 .. include:: ../../README.rst
    :start-after: .. contacts-start
    :end-before: .. contacts-end
 
-Publications
-------------
+Publications / Публикации
+-------------------------
 
-.. .. include:: ../../README.rst
-..    :start-after: .. publications-start
-..    :end-before: .. publications-end
+(Добавьте сюда список публикаций, связанных с PopFrame, если есть)

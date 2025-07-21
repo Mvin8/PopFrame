@@ -1,14 +1,15 @@
 Examples
 =========
 
-The examples below may help with getting used to the library.
+Ниже приведены отдельные примеры использования библиотеки.
 
 .. toctree::
-   :glob:
-   :maxdepth: 2
+   :maxdepth: 1
 
-   pipeline
-   blocks_generator
-   graph_generator
-   city
-   methods/index
+   Агломерации <aglomeration>
+   Опорные поселения <anchor_settelment>
+   Критерий для hex <criterion_hex>
+   Инженерная инфраструктура <engineer>
+   Оценка землепользования <landuse_assessment>
+   Пространственное неравенство <spatial_inequality>
+   Оценка территории <territory_evaluation>
