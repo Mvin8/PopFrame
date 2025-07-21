@@ -6,10 +6,10 @@ Examples
 .. toctree::
    :maxdepth: 1
 
-   Агломерации <aglomeration>
-   Опорные поселения <anchor_settelment>
-   Критерий для hex <criterion_hex>
-   Инженерная инфраструктура <engineer>
-   Оценка землепользования <landuse_assessment>
-   Пространственное неравенство <spatial_inequality>
+   Построение границ агломераций <aglomeration>
+   Построени границ опорных населенных пунктов <anchor_settelment>
+   Оценка критериев для гексагональной сетки <criterion_hex>
+   Оценка инженерной инфраструктуры <engineer>
+   Оценка землепользования <land_use_assessment>
+   Оценка пространственного неравенства <spatial_inequality>
    Оценка территории <territory_evaluation>
