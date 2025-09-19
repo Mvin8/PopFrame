@@ -5,7 +5,10 @@ This module provides all necessary tools to get accesibility matrix from transpo
 from typing import Any
 
 import geopandas as gpd
-import networkit as nk
+try:
+    import networkit as nk  # type: ignore
+except Exception as exc:  # pragma: no cover
+    nk = None  # will be validated at runtime
 import networkx as nx
 import pandas as pd
 from pydantic import BaseModel, InstanceOf, field_validator
@@ -90,7 +93,7 @@ class AdjacencyCalculator(BaseModel):  # pylint: disable=too-few-public-methods
     @classmethod
     def _convert_nx2nk(  # pylint: disable=too-many-locals,invalid-name
         cls, graph_nx: nx.MultiDiGraph, idmap: dict | None = None, weight: str = "time_min"
-    ) -> nk.Graph:
+    ):
         """
         This method converts `networkx` graph to `networkit` graph to fasten calculations.
 
@@ -109,6 +112,11 @@ class AdjacencyCalculator(BaseModel):  # pylint: disable=too-few-public-methods
 
         """
 
+        if nk is None:
+            raise ImportError(
+                "networkit is required for fast accessibility calculations. "
+                "Install optional extra: pip install 'popframe[speed]'"
+            )
         if not idmap:
             idmap = cls._get_nx2nk_idmap(graph_nx)
         n = max(idmap.values()) + 1
@@ -134,7 +142,7 @@ class AdjacencyCalculator(BaseModel):  # pylint: disable=too-few-public-methods
         return graph_nk
 
     def _get_nk_distances(
-        self, nk_dists: nk.base.Algorithm, loc: pd.Series, from_blocks  # pylint: disable=c-extension-no-member
+        self, nk_dists, loc: pd.Series, from_blocks  # pylint: disable=c-extension-no-member
     ) -> pd.Series:
         """
         This method calculates distances between blocks using nk SPSP algorithm.

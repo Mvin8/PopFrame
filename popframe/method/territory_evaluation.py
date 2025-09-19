@@ -9,6 +9,12 @@ import pandas as pd
 
 
 from ..models.region import Town
+from ..utils.const import (
+    BUFFER_NEARBY_SETTLEMENT_M,
+    BUFFER_BETWEEN_SETTLEMENTS_M,
+    BETWEEN_SETTLEMENT_RATIO,
+    DENSITY_SCORE_TABLE,
+)
 from .base_method import BaseMethod
 
 
@@ -214,7 +220,7 @@ class TerritoryEvaluation(BaseMethod):
         dict
             The results of the territory evaluation.
         """
-        buffer = territory_geom.buffer(10000)
+        buffer = territory_geom.buffer(BUFFER_NEARBY_SETTLEMENT_M)
         settlements_in_buffer = settlements_gdf[settlements_gdf.geometry.intersects(buffer)]
 
         if not settlements_in_buffer.empty:
@@ -276,7 +282,7 @@ class TerritoryEvaluation(BaseMethod):
         dict
             The results of the territory evaluation.
         """
-        buffer_20km = territory_geom.buffer(30000)
+        buffer_20km = territory_geom.buffer(BUFFER_BETWEEN_SETTLEMENTS_M)
         nearby_settlements = settlements_gdf[settlements_gdf.geometry.intersects(buffer_20km)]
 
         if len(nearby_settlements) > 1:
@@ -330,8 +336,8 @@ class TerritoryEvaluation(BaseMethod):
             distance_to_settlement2 = territory_geom.distance(settlement2.geometry)
             total_distance = distance_to_settlement1 + distance_to_settlement2
 
-            if (distance_to_settlement1 > 10000 and distance_to_settlement2 > 10000 and
-                    total_distance <= 1.2 * distance_between_settlements and
+            if (distance_to_settlement1 > BUFFER_NEARBY_SETTLEMENT_M and distance_to_settlement2 > BUFFER_NEARBY_SETTLEMENT_M and
+                    total_distance <= BETWEEN_SETTLEMENT_RATIO * distance_between_settlements and
                     total_distance < min_distance):
                 min_distance = total_distance
                 closest_settlement1 = settlement1
@@ -421,17 +427,7 @@ class TerritoryEvaluation(BaseMethod):
         """
         if density == 0 and population == 0:
             return 0
-        score_df = pd.DataFrame([
-            {'min_dens': 0, 'max_dens': 10, 'min_pop': 0, 'max_pop': 1000, 'score': 1},
-            {'min_dens': 0, 'max_dens': 10, 'min_pop': 1000, 'max_pop': 5000, 'score': 2},
-            {'min_dens': 0, 'max_dens': 10, 'min_pop': 5000, 'max_pop': float('inf'), 'score': 3},
-            {'min_dens': 10, 'max_dens': 50, 'min_pop': 0, 'max_pop': 1000, 'score': 2},
-            {'min_dens': 10, 'max_dens': 50, 'min_pop': 1000, 'max_pop': 5000, 'score': 3},
-            {'min_dens': 10, 'max_dens': 50, 'min_pop': 5000, 'max_pop': float('inf'), 'score': 4},
-            {'min_dens': 50, 'max_dens': float('inf'), 'min_pop': 0, 'max_pop': 1000, 'score': 3},
-            {'min_dens': 50, 'max_dens': float('inf'), 'min_pop': 1000, 'max_pop': 5000, 'score': 4},
-            {'min_dens': 50, 'max_dens': float('inf'), 'min_pop': 5000, 'max_pop': float('inf'), 'score': 5}
-        ])
+        score_df = pd.DataFrame(DENSITY_SCORE_TABLE)
 
         result = score_df[
             (score_df['min_dens'] <= density) & (density < score_df['max_dens']) &
@@ -464,4 +460,3 @@ class TerritoryEvaluation(BaseMethod):
             5: "Территория с высокими показателями численности и плотности населения, что указывает высокий потенциал развития."
         }
         return interpretations.get(score, "Неизвестный показатель.")
-

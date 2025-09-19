@@ -1,13 +1,14 @@
 from .base_method import BaseMethod
 import geopandas as gpd
 from shapely.geometry import Point, Polygon, MultiPolygon
-from popframe.preprocessing.level_filler import LevelFiller
 import pandas as pd
 from shapely.ops import unary_union
+from typing import Dict, List, Optional
 
-RADIUS = 400
-MIN_POPULATION = 15000
-IN_AGGLOMERATION = {}
+from popframe.utils.const import (
+    TIME_TO_METERS_FACTOR,
+    MIN_CITY_POPULATION_FOR_AGGLO,
+)
 
 CITY_LEVELS = [
             "Малый город",
@@ -20,8 +21,14 @@ CITY_LEVELS = [
 
 
 class AgglomerationBuilder(BaseMethod):
+    """Build urban agglomerations based on travel-time accessibility."""
 
-    def _build_agglomeration(self, towns, time):
+    # Instance-scoped parameters (not globals)
+    radius_m_per_min: int = TIME_TO_METERS_FACTOR
+    min_population: int = MIN_CITY_POPULATION_FOR_AGGLO
+    _in_agglomeration: Dict[int, bool] = {}
+
+    def _build_agglomeration(self, towns: gpd.GeoDataFrame, time: int) -> gpd.GeoDataFrame:
         """
         Builds agglomerations for cities based on the accessibility matrix and travel time.
         
@@ -40,7 +47,7 @@ class AgglomerationBuilder(BaseMethod):
             level_nodes = towns[towns['level'] == level].sort_values(by='population', ascending=False)
 
             for node, population in level_nodes[['id', 'population']].itertuples(index=False):
-                if node in IN_AGGLOMERATION or population < MIN_POPULATION:
+                if node in self._in_agglomeration or population < self.min_population:
                     continue
 
                 agglomeration = self._get_agglomeration_around_node(node, max_time, towns)
@@ -50,8 +57,8 @@ class AgglomerationBuilder(BaseMethod):
                     agglomerations.append(agglomeration)
 
                     for member_node in agglomeration["nodes_in_agglomeration"]:
-                        if node_population.get(member_node) < MIN_POPULATION:
-                            IN_AGGLOMERATION[member_node] = True
+                        if node_population.get(member_node) < self.min_population:
+                            self._in_agglomeration[member_node] = True
 
         if agglomerations:
             agglomeration_gdf = gpd.GeoDataFrame(
@@ -63,7 +70,7 @@ class AgglomerationBuilder(BaseMethod):
 
         return agglomeration_gdf
 
-    def _get_agglomeration_around_node(self, start_node, max_time, towns):
+    def _get_agglomeration_around_node(self, start_node: int, max_time: int, towns: gpd.GeoDataFrame) -> Optional[dict]:
         """
         Finds the agglomeration around a given city node within the specified time limit using the accessibility matrix.
         
@@ -88,7 +95,7 @@ class AgglomerationBuilder(BaseMethod):
         nodes_gdf = gpd.GeoDataFrame(nodes_data, geometry='geometry', crs=self.region.crs)
 
         # Calculate the remaining distance buffer
-        distance = {node: (max_time - distances_from_start[node]) * RADIUS for node in within_time_nodes}
+        distance = {node: (max_time - distances_from_start[node]) * self.radius_m_per_min for node in within_time_nodes}
         nodes_gdf["left_distance"] = nodes_gdf.index.map(distance)
         agglomeration_geom = nodes_gdf.buffer(nodes_gdf["left_distance"]).unary_union
 
@@ -97,7 +104,7 @@ class AgglomerationBuilder(BaseMethod):
             "nodes_in_agglomeration": list(within_time_nodes)
         }
 
-    def _merge_intersecting_agglomerations(self, gdf, towns):
+    def _merge_intersecting_agglomerations(self, gdf: gpd.GeoDataFrame, towns: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """
         Merges intersecting agglomerations into larger polygons and sums up the population.
         
@@ -175,7 +182,7 @@ class AgglomerationBuilder(BaseMethod):
         return gpd.GeoDataFrame(merged_geometries, crs=gdf.crs)
 
 
-    def _simplify_multipolygons(self, gdf):
+    def _simplify_multipolygons(self, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """
         Simplifies multipolygons to keep only the largest polygon for each agglomeration.
         
@@ -191,7 +198,7 @@ class AgglomerationBuilder(BaseMethod):
         return gdf
 
 
-    def evaluate_city_agglomeration_status(self, towns, agglomeration_gdf):
+    def evaluate_city_agglomeration_status(self, towns: gpd.GeoDataFrame, agglomeration_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """
         Evaluates cities according to their position in the agglomeration.
         
@@ -244,7 +251,7 @@ class AgglomerationBuilder(BaseMethod):
         return towns
 
 
-    def get_agglomerations(self, update_df: pd.DataFrame | None = None, time: int = 80) -> gpd.GeoDataFrame:
+    def get_agglomerations(self, update_df: Optional[pd.DataFrame] = None, time: int = 80) -> gpd.GeoDataFrame:
         """
         The main function that orchestrates the creation, merging, and finalization of agglomerations.
         

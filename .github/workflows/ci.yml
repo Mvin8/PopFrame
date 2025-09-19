@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+      - name: Black check
+        run: black --check popframe tests
+      - name: Isort check
+        run: isort --check-only popframe tests
+      - name: Pylint (non-blocking)
+        run: |
+          pylint popframe || true
+      - name: Pytest
+        run: pytest -q

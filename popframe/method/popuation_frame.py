@@ -1,12 +1,6 @@
-from typing import List
-import numpy as np
-import networkx as nx
 import geopandas as gpd
-import folium
-import json
-from ..models.region import Town
-import matplotlib.colors as mcolors
-from shapely.geometry import Point, Polygon
+from ..utils.const import METERS_PER_DEGREE
+from shapely.geometry import Point
 import pandas as pd
 
 from .base_method import BaseMethod
@@ -50,7 +44,7 @@ class PopulationFrame(BaseMethod):
         if level in ["Малое сельское поселение", "Среднее сельское поселение", "Большое сельское поселение"]:
             return 0.0001 * (population ** 0.5)   # Logarithmic scale for small settlements
         elif level == "Сверхкрупный город":
-            return 0.00006 * (population ** 0.5)  # Reduced linear scale for very large cities
+            return 6e-5 * (population ** 0.5)  # Reduced linear scale for very large cities
         return 0.0001 * (population ** 0.5)  # Linear scale for large settlements
 
     def _convert_points_to_circles(self, gdf):
@@ -68,12 +62,12 @@ class PopulationFrame(BaseMethod):
             GeoDataFrame with circular geometries.
         """
         gdf['size'] = gdf.apply(lambda row: self._size_from_population(row['population'], row['level']), axis=1)
-        gdf['size_in_meters'] = gdf['size'] * 111320
+        gdf['size_in_meters'] = gdf['size'] * METERS_PER_DEGREE
         gdf['geometry'] = gdf.apply(lambda row: self._create_circle(row['geometry'], row['size_in_meters']) if isinstance(row['geometry'], Point) else row['geometry'], axis=1)
         gdf = gdf.drop(columns=['size', 'size_in_meters'])
         return gdf
 
-    def build_circle_frame(self, update_df: pd.DataFrame | None = None):
+    def build_circle_frame(self, update_df: pd.DataFrame | None = None) -> gpd.GeoDataFrame:
         """
         Build a GeoDataFrame of circles representing settlements based on population and level.
 

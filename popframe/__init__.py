@@ -2,7 +2,7 @@
 Provision assessment for cities of an urban region
 """
 
-__version__ = "0.0.1"
+__version__ = "0.1"
 __author__ = ""
 __email__ = ""
 __credits__ = []

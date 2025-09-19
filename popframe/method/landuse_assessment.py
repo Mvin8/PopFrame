@@ -1,6 +1,6 @@
 import osmnx as ox
 import geopandas as gpd
-from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
+from shapely.geometry import Polygon, MultiPolygon
 from shapely.ops import unary_union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from retrying import retry
@@ -11,6 +11,9 @@ from matplotlib.lines import Line2D
 from .base_method import BaseMethod
 import math
 from tqdm import tqdm
+from typing import Dict, Optional
+
+from popframe.utils.const import LANDUSE_TAGS, LANDUSE_COLORS, LANDUSE_MAPPING
 
 class LandUseAssessment(BaseMethod):
 
@@ -33,7 +36,7 @@ class LandUseAssessment(BaseMethod):
         """
         return ox.features_from_polygon(polygon, tags=tags)
 
-    def get_landuse_data(self, territories):
+    def get_landuse_data(self, territories: Optional[gpd.GeoDataFrame] = None, landuse_tags: Optional[Dict[str, list]] = None) -> gpd.GeoDataFrame:
         """
         Retrieve and process land use data for given territories.
 
@@ -47,20 +50,8 @@ class LandUseAssessment(BaseMethod):
         geopandas.GeoDataFrame
             GeoDataFrame with land use indicators and geometries.
         """
-        territories_gdf = territories
-        if territories is None:
-            territories_gdf = self.region.get_territories_gdf()
-
-        landuse_tags = {
-            '1.3.1 Процент застройки жилищным строительством': ['residential', 'apartments', 'detached', 'construction'],
-            '1.3.2 Процент земель сельскохозяйственного назначения': ['farmland', 'farmyard', 'orchard', 'vineyard', 'greenhouse_horticulture', 'meadow', 'plant_nursery', 'aquaculture', 'animal_keeping', 'breeding', 'grassland'],
-            '1.3.3 Процент земель промышленного назначения': ['industrial', 'quarry', 'landfill'],
-            '1.3.4 Процент земель, занятых лесными массивами': ['forest', 'wood'],
-            '1.3.5 Процент земель специального назначения': ['military', 'railway', 'cemetery', 'landfill', 'brownfield'],
-            '1.3.6 Процент земель населенных пунктов': ['place_city', 'place_town'],
-            '1.3.7 Процент земель, занятых особо охраняемыми природными территориями': ['national_park', 'protected_area', 'nature_reserve', 'conservation'],
-            '1.3.8 Процент земель, занятых водным фондом': ['basin', 'reservoir', 'water', 'salt_pond']
-        }
+        territories_gdf = territories if territories is not None else self.region.get_territories_gdf()
+        landuse_tags = landuse_tags or LANDUSE_TAGS
 
         unique_tags = set(tag for tags in landuse_tags.values() for tag in tags)
         tag_filters = [{'landuse': tag} for tag in unique_tags if not tag.startswith('place_')] + \
@@ -93,7 +84,7 @@ class LandUseAssessment(BaseMethod):
                             if gdf.crs is None:
                                 gdf.set_crs(epsg=4326, inplace=True)
                             unique_gdfs[frozenset(tag_filter.items())] = gdf
-                    except Exception as e:
+                    except Exception:
                         pass
 
             combined_geometries = []
@@ -202,7 +193,7 @@ class LandUseAssessment(BaseMethod):
         return results_gdf
 
 
-    def plot_landuse(self, region_gdf, landuse_gdf):
+    def plot_landuse(self, region_gdf: gpd.GeoDataFrame, landuse_gdf: gpd.GeoDataFrame, *, colors: Optional[Dict[str, str]] = None, landuse_mapping: Optional[Dict[str, str]] = None) -> None:
         """
         Plot the land use data on a map with region boundaries and legend.
 
@@ -227,29 +218,8 @@ class LandUseAssessment(BaseMethod):
         
         region_gdf_utm.boundary.plot(ax=ax, linewidth=1, color='black', label='Граница региона')
 
-        colors = {
-            'Застройка жилищным строительством': 'blue',
-            'Сельскохозяйственные земли': 'yellow',
-            'Промышленные земли': 'gray',
-            'Лесные массивы': 'green',
-            'Земли специального назначения': 'brown',
-            'Земли населенных пунктов': 'orange',
-            'Особо охраняемые природные территории': 'purple',
-            'Водный фонд': 'cyan',
-            'Территории смежного назначения': 'white'
-        }
-        
-        landuse_mapping = {
-            'Процент застройки жилищным строительством': 'Застройка жилищным строительством',
-            'Процент земель сельскохозяйственного назначения': 'Сельскохозяйственные земли',
-            'Процент земель промышленного назначения': 'Промышленные земли',
-            'Процент земель, занятых лесными массивами': 'Лесные массивы',
-            'Процент земель специального назначения': 'Земли специального назначения',
-            'Процент земель населенных пунктов': 'Земли населенных пунктов',
-            'Процент земель, занятых особо охраняемыми природными территориями': 'Особо охраняемые природные территории',
-            'Процент земель, занятых водным фондом': 'Водный фонд',
-            'Территории смежного назначения': 'Территории смежного назначения'
-        }
+        colors = colors or LANDUSE_COLORS
+        landuse_mapping = landuse_mapping or LANDUSE_MAPPING
         
         for key, label in landuse_mapping.items():
             gdf = landuse_gdf[landuse_gdf['Название хранимое'] == key]

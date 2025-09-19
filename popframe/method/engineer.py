@@ -1,6 +1,7 @@
 import geopandas as gpd
 from shapely.geometry.base import BaseGeometry
-from typing import Dict, Any, Set, List
+from typing import Dict, Any, Set
+from popframe.utils.const import RADIUS_NPP_M, RADIUS_HPP_M, RADIUS_DEFAULT_INFRA_M
 
 class InfrastructureAnalyzer:
     def __init__(self, infrastructure_gdf: gpd.GeoDataFrame, assessment_areas_gdf: gpd.GeoDataFrame) -> None:
@@ -40,11 +41,10 @@ class InfrastructureAnalyzer:
         """
         name = physical_object_type.get('name', '')
         if "Атомная электростанция" in name:
-            return 100000.0  # 100 km in meters for nuclear power plants
-        elif "Гидроэлектростанция" in name:
-            return 10000.0   # 10 km in meters for hydroelectric power plants
-        else:
-            return 1000.0    # 1 km in meters for other types
+            return float(RADIUS_NPP_M)
+        if "Гидроэлектростанция" in name:
+            return float(RADIUS_HPP_M)
+        return float(RADIUS_DEFAULT_INFRA_M)
     
     def _analyze_infrastructure(self) -> None:
         """

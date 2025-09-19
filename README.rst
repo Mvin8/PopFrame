@@ -83,7 +83,7 @@ Below are examples for the main modules of PopFrame.
 **1. Region (models):**
 ```python
 from popframe.models.region import Region
-region = Region.from_pickle('data/region.pickle')
+region = Region.from_pickle('examples/data/Ленинградская область.pickle')
 print(region.towns)
 ```
 
@@ -139,6 +139,14 @@ from popframe.utils.const import *
 
 See more examples in the `examples/` directory and documentation.
 Больше примеров — в папке `examples/` и в документации.
+
+Data for the notebooks is provided under `examples/data`.
+- EN: Example notebooks expect inputs from `examples/data` (GeoJSON/Pickle). If you use your own region, update paths accordingly.
+- RU: Для запуска ноутбуков используйте данные из `examples/data`. Если работаете со своими данными, поправьте пути в ноутбуках.
+
+Notes on external data access:
+- EN: Some examples fetch OpenStreetMap data (e.g., land use). Ensure internet access. If your environment requires VPN (e.g., Forti), connect before running.
+- RU: Часть примеров получает данные из OSM. Нужен доступ в интернет (при необходимости подключите VPN, например Forti).
 
 Project Structure / Структура проекта
 ------------------------------------
@@ -251,8 +259,6 @@ Contacts / Контакты
 - `Maksim Natykin <https://t.me/Mvin98>`__ — lead software engineer
 
 .. contacts-end
-
-
 
 
 

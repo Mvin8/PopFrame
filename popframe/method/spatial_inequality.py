@@ -1,7 +1,7 @@
 import geopandas as gpd
 import re
 from typing import Optional, Tuple, Dict
-from popframe.method.base_method import BaseMethod  # замените на ваш реальный импорт
+from popframe.method.base_method import BaseMethod
 
 class SpatialInequalityCalculator(BaseMethod):
     """
@@ -14,7 +14,7 @@ class SpatialInequalityCalculator(BaseMethod):
         self,
         gdf_cities: gpd.GeoDataFrame,
         gdf_polygons: gpd.GeoDataFrame,
-        inequality_keyword: str = "Нерaвенство"
+        inequality_keyword: str = "Неравенство"
     ) -> Tuple[gpd.GeoDataFrame, Dict[str, Dict[str, float]]]:
         """
         Transfer all columns containing inequality metrics from points (cities) to polygons (agglomerations)
