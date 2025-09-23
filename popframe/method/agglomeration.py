@@ -19,14 +19,60 @@ CITY_LEVELS = [
     "Сверхкрупный город",
 ]
 
+
 class AgglomerationBuilder(BaseMethod):
-    """Build urban agglomerations based on travel-time accessibility."""
+    """
+    Build urban agglomerations from a towns layer and a travel-time matrix.
+
+    Notes
+    -----
+    The algorithm:
+    1) Iterates city levels from largest to smallest and selects candidate centers.
+    2) For each center, takes all towns reachable within a time threshold and
+       buffers them by the remaining time (converted to meters).
+    3) Unifies buffers to produce proto-agglomerations.
+    4) Merges intersecting proto-agglomerations and aggregates attributes.
+    5) Clips to the region boundary and simplifies MultiPolygons.
+
+    Attributes
+    ----------
+    radius_m_per_min : int
+        Conversion factor from minutes of travel time to meters of buffer radius.
+    min_population : int
+        Minimal population for a town to be considered as a center or member.
+    _in_agglomeration : Dict[int, bool]
+        Registry of nodes already assigned to an agglomeration.
+    """
 
     radius_m_per_min: int = TIME_TO_METERS_FACTOR
     min_population: int = MIN_CITY_POPULATION_FOR_AGGLO
     _in_agglomeration: Dict[int, bool] = {}
 
     def _build_agglomeration(self, towns: gpd.GeoDataFrame, time: int) -> gpd.GeoDataFrame:
+        """
+        Build proto-agglomerations for eligible centers by level and time threshold.
+
+        Parameters
+        ----------
+        towns : GeoDataFrame
+            Towns with columns: ``id``, ``name``, ``population``, ``level``, ``geometry`` (Points).
+            CRS must match ``self.region.crs``.
+        time : int
+            Global time budget in minutes. Effective per-level budget decreases by 10 minutes
+            per level step when iterating from largest to smallest.
+
+        Returns
+        -------
+        GeoDataFrame
+            Columns: ``name``, ``geometry``. Geometry is Polygon or MultiPolygon.
+            Always has active geometry and CRS.
+
+        Notes
+        -----
+        Centers are filtered by ``level in CITY_LEVELS`` and ``population >= min_population``.
+        Remaining-time buffers are computed as
+        ``(time_center - distance_minutes) * radius_m_per_min``.
+        """
         node_population = towns.set_index("id")["population"]
         node_names = towns.set_index("id")["name"]
         agglomerations = []
@@ -64,7 +110,32 @@ class AgglomerationBuilder(BaseMethod):
 
         return agglomeration_gdf
 
-    def _get_agglomeration_around_node(self, start_node: int, max_time: int, towns: gpd.GeoDataFrame) -> Optional[dict]:
+    def _get_agglomeration_around_node(
+        self, start_node: int, max_time: int, towns: gpd.GeoDataFrame
+    ) -> Optional[dict]:
+        """
+        Build a single proto-agglomeration around a candidate center.
+
+        Parameters
+        ----------
+        start_node : int
+            ID of the center town.
+        max_time : int
+            Maximum travel time (minutes) from ``start_node`` to include towns.
+        towns : GeoDataFrame
+            Towns table aligned with the accessibility matrix index.
+
+        Returns
+        -------
+        dict or None
+            ``{"geometry": Polygon|MultiPolygon, "nodes_in_agglomeration": List[int]}``
+            or ``None`` if no towns are reachable within ``max_time``.
+
+        Notes
+        -----
+        Uses ``self.region.accessibility_matrix`` with minutes as units.
+        Guarantees point geometry for towns by coercing to centroid if needed.
+        """
         accessibility_matrix = self.region.accessibility_matrix
 
         distances_from_start = accessibility_matrix.loc[start_node]
@@ -75,24 +146,46 @@ class AgglomerationBuilder(BaseMethod):
 
         nodes_data = towns.set_index("id").loc[within_time_nodes].copy()
 
-        # гарантируем геометрию-точку (на случай, если пришло не Point)
+        # ensure point-like geometry
         nodes_data["geometry"] = nodes_data["geometry"].apply(
             lambda geom: Point(geom.x, geom.y) if isinstance(geom, Point) else geom.centroid
         )
 
         nodes_gdf = gpd.GeoDataFrame(nodes_data, geometry="geometry", crs=self.region.crs)
 
-        # остаточная дистанция буфера
+        # remaining buffer distance in meters
         distance = {node: (max_time - distances_from_start[node]) * self.radius_m_per_min for node in within_time_nodes}
         nodes_gdf["left_distance"] = nodes_gdf.index.map(distance)
 
-        # буфер переменного радиуса и объединение
         agglomeration_geom = nodes_gdf.buffer(nodes_gdf["left_distance"]).unary_union
 
         return {"geometry": agglomeration_geom, "nodes_in_agglomeration": list(within_time_nodes)}
 
-    def _merge_intersecting_agglomerations(self, gdf: gpd.GeoDataFrame, towns: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-        # защита для пустого входа
+    def _merge_intersecting_agglomerations(
+        self, gdf: gpd.GeoDataFrame, towns: gpd.GeoDataFrame
+    ) -> gpd.GeoDataFrame:
+        """
+        Merge intersecting proto-agglomerations and compute attributes.
+
+        Parameters
+        ----------
+        gdf : GeoDataFrame
+            Proto-agglomerations with columns ``name`` and ``geometry``.
+        towns : GeoDataFrame
+            Towns layer used to aggregate population.
+
+        Returns
+        -------
+        GeoDataFrame
+            Columns: ``geometry``, ``type``, ``core_cities``, ``population``, ``agglomeration_level``.
+            Always has active geometry and CRS.
+
+        Notes
+        -----
+        Intersection is tested geometrically. Geometries are unioned via ``unary_union``.
+        Invalid geometries are repaired with ``buffer(0)``.
+        Agglomeration level is derived from total population thresholds.
+        """
         if gdf.empty:
             return gpd.GeoDataFrame(
                 columns=["geometry", "type", "core_cities", "population", "agglomeration_level"],
@@ -107,14 +200,12 @@ class AgglomerationBuilder(BaseMethod):
             if i in processed_indices:
                 continue
 
-            overlapping_agglomerations = [row_i]
             geometry = row_i["geometry"]
             merged_names = {row_i["name"]}
 
             for j, row_j in gdf.iterrows():
                 if i != j and j not in processed_indices:
                     if geometry.intersects(row_j["geometry"]):
-                        overlapping_agglomerations.append(row_j)
                         geometry = unary_union([geometry, row_j["geometry"]])
                         merged_names.add(row_j["name"])
                         processed_indices.add(j)
@@ -123,13 +214,11 @@ class AgglomerationBuilder(BaseMethod):
             while still_intersecting:
                 still_intersecting = False
                 for j, row_j in gdf.iterrows():
-                    if j not in processed_indices:
-                        if geometry.intersects(row_j["geometry"]):
-                            overlapping_agglomerations.append(row_j)
-                            geometry = unary_union([geometry, row_j["geometry"]])
-                            merged_names.add(row_j["name"])
-                            processed_indices.add(j)
-                            still_intersecting = True
+                    if j not in processed_indices and geometry.intersects(row_j["geometry"]):
+                        geometry = unary_union([geometry, row_j["geometry"]])
+                        merged_names.add(row_j["name"])
+                        processed_indices.add(j)
+                        still_intersecting = True
 
             if not geometry.is_valid:
                 geometry = geometry.buffer(0)
@@ -162,6 +251,19 @@ class AgglomerationBuilder(BaseMethod):
         return gpd.GeoDataFrame(merged_geometries, geometry="geometry", crs=gdf.crs)
 
     def _simplify_multipolygons(self, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """
+        Keep only the largest polygon for MultiPolygon geometries.
+
+        Parameters
+        ----------
+        gdf : GeoDataFrame
+            Input geometries.
+
+        Returns
+        -------
+        GeoDataFrame
+            Copy with simplified geometries. Empty input is returned unchanged.
+        """
         if gdf.empty:
             return gdf
         gdf = gdf.copy()
@@ -173,6 +275,23 @@ class AgglomerationBuilder(BaseMethod):
     def evaluate_city_agglomeration_status(
         self, towns: gpd.GeoDataFrame, agglomeration_gdf: gpd.GeoDataFrame
     ) -> gpd.GeoDataFrame:
+        """
+        Label towns by agglomeration membership and level.
+
+        Parameters
+        ----------
+        towns : GeoDataFrame
+            Towns layer with point geometries and columns ``name`` and ``geometry``.
+        agglomeration_gdf : GeoDataFrame
+            Agglomerations with columns ``geometry``, ``core_cities``, ``agglomeration_level``.
+
+        Returns
+        -------
+        GeoDataFrame
+            ``towns`` copy with two columns added:
+            - ``agglomeration_status``: {"Вне агломерации","В агломерации","Центр агломерации"}
+            - ``agglomeration_level``: int in {0..5}
+        """
         agglomeration_status = []
         agglomeration_level = []
 
@@ -208,35 +327,101 @@ class AgglomerationBuilder(BaseMethod):
         towns["agglomeration_level"] = agglomeration_level
         return towns
 
-    def get_agglomerations(self, update_df: Optional[pd.DataFrame] = None, time: int = 80) -> gpd.GeoDataFrame:
-        towns = self.region.get_update_towns_gdf(update_df)
+    def get_agglomerations(
+        self,
+        update_df: Optional[pd.DataFrame] = None,
+        time: int = 80,
+        raise_on_empty: bool = True,
+    ) -> gpd.GeoDataFrame:
+        """
+        Build, merge, clip, and finalize urban agglomerations.
 
-        if towns is None or len(towns) < 2:
-            raise ValueError("Для построения агломерации требуется минимум два города.")
+        Parameters
+        ----------
+        update_df : DataFrame, optional
+            If provided, used by ``self.region.get_update_towns_gdf`` to update towns.
+        time : int, default 80
+            Global time budget in minutes. Values < 50 are coerced to 50.
+        raise_on_empty : bool, default True
+            If True, raise an error when no eligible towns or no agglomerations are produced.
 
-        valid_pop = towns["population"].notnull() & (towns["population"] > 0)
-        if valid_pop.sum() < 2:
-            raise ValueError("Требуются данные о населении минимум у двух разных городов.")
+        Returns
+        -------
+        GeoDataFrame
+            Final agglomerations after merge, clip, and simplification.
 
-        if time < 50:
-            print("Минимально допустимое значение параметра 'time' — 50 минут. Заменяю на 50.")
-            time = 50
+        Raises
+        ------
+        ValueError
+            If there are fewer than two towns or fewer than two towns with valid population.
+        RuntimeError
+            If no towns pass level/population filters or no agglomerations can be built
+            and ``raise_on_empty`` is True.
+        RuntimeError
+            On any unexpected error inside the pipeline, with original exception chained.
 
-        region_boundary = self.region.region  
+        Notes
+        -----
+        The function validates candidates by
+        ``towns['level'].isin(CITY_LEVELS)`` and
+        ``towns['population'] >= self.min_population`` before building.
+        """
+        try:
+            towns = self.region.get_update_towns_gdf(update_df)
+            if towns is None or len(towns) < 2:
+                raise ValueError("Для построения агломерации требуется минимум два города.")
 
-        agglomeration_gdf = self._build_agglomeration(towns, time)
+            valid_pop = towns["population"].notnull() & (towns["population"] > 0)
+            if valid_pop.sum() < 2:
+                raise ValueError("Требуются данные о населении минимум у двух разных городов.")
 
-        # 2) Упростить мультиполигоны перед слиянием
-        agglomeration_gdf = self._simplify_multipolygons(agglomeration_gdf)
+            if time < 50:
+                print("Минимально допустимое значение параметра 'time' — 50 минут. Заменяю на 50.")
+                time = 50
 
-        # 3) Слияние пересекающихся и расчет показателей
-        agglomeration_gdf = self._merge_intersecting_agglomerations(agglomeration_gdf, towns)
+            # preliminary eligibility check
+            mask_level = towns["level"].isin(CITY_LEVELS)
+            mask_pop = towns["population"] >= self.min_population
+            eligible = towns[mask_level & mask_pop]
+            if eligible.empty and raise_on_empty:
+                levels_sample = list(towns["level"].value_counts().head(5).items())
+                raise RuntimeError(
+                    "No towns pass level and population criteria: "
+                    f"min_population={self.min_population}, allowed levels={CITY_LEVELS}. "
+                    f"Levels distribution (top5): {levels_sample}"
+                )
 
-        # 4) Обрезка по границе региона
-        if not agglomeration_gdf.empty:
-            agglomeration_gdf = gpd.overlay(agglomeration_gdf, region_boundary, how="intersection")
+            region_boundary = self.region.region
 
-        # 5) Финальная чистка геометрии
-        agglomeration_gdf = self._simplify_multipolygons(agglomeration_gdf)
+            # 1) build proto-agglomerations
+            agglomeration_gdf = self._build_agglomeration(towns, time)
 
-        return agglomeration_gdf
+            # explicit error if nothing produced
+            if agglomeration_gdf.empty and raise_on_empty:
+                lvl_ok = towns[mask_level]
+                pop_ok = towns[mask_pop]
+                msg_parts = []
+                if lvl_ok.empty:
+                    msg_parts.append("no towns with allowed levels (CITY_LEVELS)")
+                if pop_ok.empty:
+                    msg_parts.append("no towns reaching min_population")
+                if not msg_parts:
+                    msg_parts.append("accessibility produced no reachable sets at given time")
+                raise RuntimeError("Agglomerations not built: " + "; ".join(msg_parts))
+
+            # 2) simplify
+            agglomeration_gdf = self._simplify_multipolygons(agglomeration_gdf)
+
+            # 3) merge overlapping and compute attributes
+            agglomeration_gdf = self._merge_intersecting_agglomerations(agglomeration_gdf, towns)
+
+            # 4) clip to region boundary
+            if not agglomeration_gdf.empty:
+                agglomeration_gdf = gpd.overlay(agglomeration_gdf, region_boundary, how="intersection")
+
+            # 5) final simplify
+            agglomeration_gdf = self._simplify_multipolygons(agglomeration_gdf)
+            return agglomeration_gdf
+
+        except Exception as e:
+            raise RuntimeError(f"Ошибка при построении агломераций: {e}") from None
