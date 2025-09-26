@@ -36,7 +36,8 @@ dependencies = [
   "folium>=0.14.0",
   "dill>=0.3.8",
   "python-louvain",
-  "geovoronoi"
+  "geovoronoi",
+  "retrying"
 ]
 
 
